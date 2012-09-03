@@ -96,7 +96,7 @@ import com.hellblazer.jmx.cascading.proxy.ProxyCascadingAgent;
  * {@link JMXConnectionNotification} with the following parameters:
  * <ul>
  * <li>The <var>type</var> is <tt>{@link #CASCADING_FAILED_NOTIFICATION 
- *     "com.sun.jdmk.remote.cascading.failed"}</tt></li>
+ *     "com.hellblazer.jmx.cascading.failed"}</tt></li>
  * <li>The <var>source</var> is the <tt>CascadingServiceMBean</tt>.</tt></li>
  * <li>The <var>connectionId</var> is the <var>mountPointID</var> that was
  * returned by the the {@link #mount mount} method</li>
@@ -109,7 +109,7 @@ import com.hellblazer.jmx.cascading.proxy.ProxyCascadingAgent;
  * with the following parameters:
  * <ul>
  * <li>The <var>type</var> is <tt>{@link #CASCADING_STOPPED_NOTIFICATION 
- *     "com.sun.jdmk.remote.cascading.stopped"}</tt></li>
+ *     "com.hellblazer.jmx.cascading.stopped"}</tt></li>
  * <li>The <var>source</var> is the <tt>CascadingServiceMBean</tt>.</tt></li>
  * <li>The <var>connectionId</var> is the <var>mountPointID</var> that was
  * returned by the the {@link #mount mount} method</li>
@@ -122,7 +122,7 @@ import com.hellblazer.jmx.cascading.proxy.ProxyCascadingAgent;
  * not perform any checks with regards to the coherency of the supplied
  * <var>targetPath</var>. It is under the responsibility of the application to
  * conform to the rules documented in
- * {@link com.sun.jdmk.remote.cascading#The_File_System_Analogy The File System
+ * {@link com.hellblazer.jmx.cascading#The_File_System_Analogy The File System
  * Analogy}
  * </p>
  * 

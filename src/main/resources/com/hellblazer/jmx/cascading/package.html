@@ -54,7 +54,7 @@
     of cascading (proxy-based, interceptor-based) may coexist.
     
     <p>A proxy-based cascading agent is implemented in the 
-      {@link com.sun.jdmk.remote.cascading.proxy} package.</p>
+      {@link com.hellblazer.jmx.cascading.proxy} package.</p>
     
     <h3><a name="Overview"></a>Overview</h3>
 
@@ -108,25 +108,25 @@
 
     <p>The cascading service proposed in this package is based on a 
       simple MBean class:
-    <ul><li>The {@link com.sun.jdmk.remote.cascading.CascadingServiceMBean} 
+    <ul><li>The {@link com.hellblazer.jmx.cascading.CascadingServiceMBean} 
 	provides methods that make it possible to mount MBeans from a 
 	<i>source MBeanServer</i> in a <i>target MBeanServer</i> under a 
 	<i>target domain path</i>.
 	Usually the target <tt>MBeanServer</tt> is the <tt>MBeanServer</tt> 
 	in which the {@link 
-	com.sun.jdmk.remote.cascading.CascadingService} is registered.
+	com.hellblazer.jmx.cascading.CascadingService} is registered.
 	<br>
 	There should be only one <tt>CascadingServiceMBean</tt> per 
 	target <tt>MBeanServer</tt>.</li>
       <li>The {@link 
-	com.sun.jdmk.remote.cascading.CascadingServiceMBean#mount 
+	com.hellblazer.jmx.cascading.CascadingServiceMBean#mount 
 	CascadingServiceMBean.mount} method  
 	mounts a partial view of a source <tt>MBeanServer</tt> known by its 
 	<tt>JMXServiceURL</tt> in the target <tt>MBeanServer</tt> of
 	the <tt>CascadingServiceMBean</tt>. 
 	</li>
       <li>The {@link 
-	com.sun.jdmk.remote.cascading.CascadingServiceMBean#unmount 
+	com.hellblazer.jmx.cascading.CascadingServiceMBean#unmount 
 	CascadingServiceMBean.unmount}  method cancels a previous
 	 <tt>mount</tt> operation. The <tt>unmount</tt> operation will
 	close the connection that was opened by the <tt>mount</tt>
@@ -135,12 +135,12 @@
       </ul>
 
     <p>This package provides a default {@link 
-      com.sun.jdmk.remote.cascading.CascadingService} class which implements
-      the {@link com.sun.jdmk.remote.cascading.CascadingServiceMBean} 
+      com.hellblazer.jmx.cascading.CascadingService} class which implements
+      the {@link com.hellblazer.jmx.cascading.CascadingServiceMBean} 
       interface. This default <tt>CascadingService</tt> implementation relies
       on proxy-based cascading and implements the 
       <tt>mount</tt> operation by instantiating behind the scene a {@link 
-      com.sun.jdmk.remote.cascading.proxy.ProxyCascadingAgent}.
+      com.hellblazer.jmx.cascading.proxy.ProxyCascadingAgent}.
     </p>
 
     <h3><a name="The_File_System_Analogy"></a>The File System Analogy</h3>
@@ -155,7 +155,7 @@
       be compared to a regular File System <i>mount</i>:
       <ul>
       <li>When calling the {@link 
-	com.sun.jdmk.remote.cascading.CascadingServiceMBean#mount 
+	com.hellblazer.jmx.cascading.CascadingServiceMBean#mount 
 	CascadingServiceMBean.mount} operation, always 
 	use a non null <i>targetPath</i>. The target path can be assimilated 
 	to a target mount point in the File System analogy.</li>
@@ -184,20 +184,20 @@
     <br>This API is however more complex and requires a deeper knowledge 
     of the inner structure of the cascading service implementation.
     <p><b>We thus recommend using the</b> {@link 
-      com.sun.jdmk.remote.cascading.CascadingService} <b>rather than working
+      com.hellblazer.jmx.cascading.CascadingService} <b>rather than working
       with the underlying implementation classes</b>.</p>
 
     The <tt>CascadingService</tt> provided in this package relies on the 
     following implementation classes:
 
     <ul><li>Like the <tt>CascadingServiceMBean</tt>, the 
-	    {@link com.sun.jdmk.remote.cascading.CascadingAgentMBean} 
+	    {@link com.hellblazer.jmx.cascading.CascadingAgentMBean} 
 	    is an MBean that makes it possible to cascade MBeans from a 
 	    <i>source MBeanServer</i> in a <i>target MBeanServer</i> under a 
 	    <i>target domain path</i>.
 	    Usually the target <tt>MBeanServer</tt> is also the 
 	    <tt>MBeanServer</tt> in which the {@link 
-	com.sun.jdmk.remote.cascading.CascadingAgent} is registered.
+	com.hellblazer.jmx.cascading.CascadingAgent} is registered.
 	In the <a href="#The_File_System_Analogy">File System Analogy</a> 
 	the <tt>CascadingAgent</tt> would be used to implement a single 
 	mount point.
@@ -209,25 +209,25 @@
 	Using a non null query filter is however discouraged.
 	<br>
 	The <tt>CascadingAgent</tt> also holds a pointer to an 
-	{@link com.sun.jdmk.remote.cascading.MBeanServerConnectionFactory}
+	{@link com.hellblazer.jmx.cascading.MBeanServerConnectionFactory}
 	which it uses to obtain {@link javax.management.MBeanServerConnection}
 	objects connected to the source <tt>MBeanServer</tt>.
       </li>
       <li>The {@link 
-	com.sun.jdmk.remote.cascading.MBeanServerConnectionFactory} is an
+	com.hellblazer.jmx.cascading.MBeanServerConnectionFactory} is an
 	interface implemented by classes that are able to return an
 	<tt>MBeanServerConnection</tt> to an <tt>MBeanServer</tt>. This 
 	package defines two trivial implementations of the 
 	<tt>MBeanServerConnectionFactory</tt>:
 	<ul><li>The {@link
-	    com.sun.jdmk.remote.cascading.LocalMBeanServerConnectionFactory}
+	    com.hellblazer.jmx.cascading.LocalMBeanServerConnectionFactory}
 	    is an <tt>MBeanServerConnectionFactory</tt> that wraps a local 
 	    <tt>MBeanServerConnection</tt> - for instance an 
 	    <tt>MBeanServer</tt>. It makes it possible to cascade MBeans 
 	    residing in a local source <tt>MBeanServer</tt>.
 	  </li>
 	  <li>The {@link
-	    com.sun.jdmk.remote.cascading.BasicMBeanServerConnectionFactory}
+	    com.hellblazer.jmx.cascading.BasicMBeanServerConnectionFactory}
 	    is an <tt>MBeanServerConnectionFactory</tt> that simply wraps a 
 	    <tt>JMXConnector</tt>. It makes it possible to cascade MBeans 
 	    residing in a remote source <tt>MBeanServer</tt>, accessible 
@@ -249,7 +249,7 @@
       Typically, an application will create a <code>JMXConnector</code>, 
       and connect it to the remote <tt>MBeanServer</tt>. Then the application
       will wrap this <tt>JMXConnector</tt> into a {@link 
-      com.sun.jdmk.remote.cascading.BasicMBeanServerConnectionFactory}.
+      com.hellblazer.jmx.cascading.BasicMBeanServerConnectionFactory}.
       The application can then create several <tt>CascadingAgents</tt>, 
       each with its own pattern and filter, but all sharing the same
       <tt>MBeanServerConnectionFactory</tt>, hence the same 
@@ -277,7 +277,7 @@
       satisfy both of them will be cascaded into the target 
       <tt>MBeanServer</tt>.
       <br>Note that in a proxy-based cascading solution, as implemented by
-      the {@link com.sun.jdmk.remote.cascading.proxy} package, the pattern 
+      the {@link com.hellblazer.jmx.cascading.proxy} package, the pattern 
       and query filters will only be evaluated at the time where the 
       target proxy MBean is registered in the target MBeanServer.
       Therefore, the <tt>QueryExp</tt> filter should 
@@ -297,7 +297,7 @@
       MBeans. The other agents will usually skip conflicting names - 
       though how conflicting names are managed is usually implementation 
       dependent - see {@link 
-      com.sun.jdmk.remote.cascading.proxy.ProxyCascadingAgent}.
+      com.hellblazer.jmx.cascading.proxy.ProxyCascadingAgent}.
       <br>
       Although our Java DMK API permit such cascading schemes - we 
       recommend to refrain from implementing them in an application.
@@ -329,7 +329,7 @@
       methods of the target {@link javax.management.MBeanServer}. 
       In the proxy-based cascading solution, the appropriate glue that
       makes this happen is implemented by the {@link 
-      com.sun.jdmk.remote.cascading.proxy.CascadingProxy} object, and is
+      com.hellblazer.jmx.cascading.proxy.CascadingProxy} object, and is
       completely transparent to the application code. However, depending on
       the cascading implementation, some of the 
       <tt>addNotificationListener(...)</tt> forms may not work - e.g. the
@@ -357,25 +357,25 @@
     </p> 
     <p>Applications that would need to perform these substitutions can do 
       so by providing their own <tt>CascadingProxy</tt> class - see {@link 
-      com.sun.jdmk.remote.cascading.proxy.ProxyCascadingAgent#createProxy 
+      com.hellblazer.jmx.cascading.proxy.ProxyCascadingAgent#createProxy 
       ProxyCascadingAgent.createProxy(name,factory)}. 
       That class could extend {@link
-      com.sun.jdmk.remote.cascading.proxy.CascadingProxy CascadingProxy} 
+      com.hellblazer.jmx.cascading.proxy.CascadingProxy CascadingProxy} 
       in order to override the {@link 
-      com.sun.jdmk.remote.cascading.proxy.CascadingProxy#getAttribute
+      com.hellblazer.jmx.cascading.proxy.CascadingProxy#getAttribute
       getAttribute}, {@link 
-      com.sun.jdmk.remote.cascading.proxy.CascadingProxy#getAttributes
+      com.hellblazer.jmx.cascading.proxy.CascadingProxy#getAttributes
       getAttributes}, and {@link 
-      com.sun.jdmk.remote.cascading.proxy.CascadingProxy#invoke
+      com.hellblazer.jmx.cascading.proxy.CascadingProxy#invoke
       invoke} methods. In that case the <tt>setAttribute</tt> and 
       <tt>setAttributes</tt> methods will probably need to be 
       also overridden in a consistent manner.</p>
 
     <h5>Interpreting ObjectNames in Forwarded Notifications</h5>
     <p>The {@link 
-      com.sun.jdmk.remote.cascading.proxy.CascadingProxy} class used
+      com.hellblazer.jmx.cascading.proxy.CascadingProxy} class used
       by the {@link 
-      com.sun.jdmk.remote.cascading.proxy.ProxyCascadingAgent} does not make
+      com.hellblazer.jmx.cascading.proxy.ProxyCascadingAgent} does not make
       the assumption that the name of the target cascading proxy in the
       target <tt>MBeanServer</tt> is the same than that of the proxied source
       MBean in the source MBeanServer. The CascadingProxy class thus contains
@@ -388,12 +388,12 @@
       that may be contained in the <tt>Notification</tt> are ignored.</p>
     <p>Applications that would need deeper substitutions can do so by providing
       their own <tt>CascadingProxy</tt> class - see {@link 
-      com.sun.jdmk.remote.cascading.proxy.ProxyCascadingAgent#createProxy 
+      com.hellblazer.jmx.cascading.proxy.ProxyCascadingAgent#createProxy 
       ProxyCascadingAgent.createProxy(name,factory)}. 
       That class could extend {@link
-      com.sun.jdmk.remote.cascading.proxy.CascadingProxy CascadingProxy} 
+      com.hellblazer.jmx.cascading.proxy.CascadingProxy CascadingProxy} 
       in order to override {@link 
-      com.sun.jdmk.remote.cascading.proxy.CascadingProxy#translate 
+      com.hellblazer.jmx.cascading.proxy.CascadingProxy#translate 
       CascadingProxy.translate(Notification)}.</p>
 
     <p><b>Note:</b> The default <tt>CascadingService</tt> implementation 
@@ -407,7 +407,7 @@
     <h5>Name Conflict Detection</h5>
 
     <p>The <tt>CascadingAgent</tt> provides a <tt>{@link 
-      com.sun.jdmk.remote.cascading.CascadingAgentMBean#start(boolean)
+      com.hellblazer.jmx.cascading.CascadingAgentMBean#start(boolean)
       start(boolean conflictAllowed)}</tt> method that will throw
       an exception if a name conflict is detected at start time when
       <tt>conflictAllowed</tt> is <tt>false</tt>. Further name conflicts 

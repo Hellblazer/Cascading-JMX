@@ -53,28 +53,28 @@
     proxy-based cascading over JMX Remote API connectors.
 
     The generic features of cascading agents are described in the
-    {@link com.sun.jdmk.remote.cascading} package description.
+    {@link com.hellblazer.jmx.cascading} package description.
     The classes provided in this package are the low level implementation
     classes on which relies the {@link 
-    com.sun.jdmk.remote.cascading.CascadingService}. You should not have
+    com.hellblazer.jmx.cascading.CascadingService}. You should not have
     to use these classes directly.
 
     <h3>Overview</h3>
-    <p>The <tt>com.sun.jdmk.remote.cascading.proxy</tt> package provides 
+    <p>The <tt>com.hellblazer.jmx.cascading.proxy</tt> package provides 
       a concrete proxy-based implementation of the {@link 
-      com.sun.jdmk.remote.cascading.CascadingAgent} called 
-      {@link com.sun.jdmk.remote.cascading.proxy.ProxyCascadingAgent}.
+      com.hellblazer.jmx.cascading.CascadingAgent} called 
+      {@link com.hellblazer.jmx.cascading.proxy.ProxyCascadingAgent}.
       The <tt>ProxyCascadingAgent</tt> is a <tt>CascadingAgent</tt> that, 
       for each source MBean cascaded from the source <tt>MBeanServer</tt> 
       registers in the target <tt>MBeanServer</tt> a {@link 
-      com.sun.jdmk.remote.cascading.proxy.CascadingProxy} MBean. 
+      com.hellblazer.jmx.cascading.proxy.CascadingProxy} MBean. 
       The <tt>CascadingProxy</tt> is a simple {@link 
       javax.management.DynamicMBean} that acts as a proxy for the source 
       MBean it is tied to.</p>
     
     <p>For more information on cascading, see the description of the
-      {@link com.sun.jdmk.remote.cascading} package, and the 
-      {@link com.sun.jdmk.remote.cascading.CascadingService} MBean.</p>
+      {@link com.hellblazer.jmx.cascading} package, and the 
+      {@link com.hellblazer.jmx.cascading.CascadingService} MBean.</p>
 
     @since Java DMK 5.1
   </body>

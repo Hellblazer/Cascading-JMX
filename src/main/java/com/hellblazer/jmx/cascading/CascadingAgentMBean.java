@@ -159,7 +159,7 @@ public interface CascadingAgentMBean {
      * 
      * @return The value of the <i>targetPath</i> under which source MBeans are
      *         mounted in the target <tt>MBeanServer</tt>.
-     * @see com.sun.jdmk.remote.cascading
+     * @see com.hellblazer.jmx.cascading
      **/
     public String getTargetPath();
 

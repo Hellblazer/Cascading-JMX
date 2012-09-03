@@ -121,7 +121,7 @@ import javax.management.remote.JMXConnectionNotification;
  * [...]
  * </pre>
  * 
- * See {@link com.sun.jdmk.remote.cascading} for more details.
+ * See {@link com.hellblazer.jmx.cascading} for more details.
  * 
  * @since Java DMK 5.1
  **/

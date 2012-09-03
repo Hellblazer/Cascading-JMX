@@ -84,7 +84,7 @@ import javax.management.remote.JMXServiceURL;
  * with the following parameters:
  * <ul>
  * <li>The <var>type</var> is <tt>{@link #CASCADING_FAILED_NOTIFICATION 
- *     "com.sun.jdmk.remote.cascading.failed"}</tt></li>
+ *     "com.hellblazer.jmx.cascading.failed"}</tt></li>
  * <li>The <var>source</var> is the <tt>CascadingServiceMBean</tt>.</tt></li>
  * <li>The <var>connectionId</var> is the <var>mountPointID</var> that was
  * returned by the the {@link #mount mount} method</li>
@@ -97,7 +97,7 @@ import javax.management.remote.JMXServiceURL;
  * with the following parameters:
  * <ul>
  * <li>The <var>type</var> is <tt>{@link #CASCADING_FAILED_NOTIFICATION 
- *     "com.sun.jdmk.remote.cascading.stopped"}</tt></li>
+ *     "com.hellblazer.jmx.cascading.stopped"}</tt></li>
  * <li>The <var>source</var> is the <tt>CascadingServiceMBean</tt>.</tt></li>
  * <li>The <var>connectionId</var> is the <var>mountPointID</var> that was
  * returned by the the {@link #mount mount} method</li>
@@ -108,8 +108,8 @@ import javax.management.remote.JMXServiceURL;
  * not perform any checks with regards to the coherency of the supplied
  * <var>targetPath</var>. It is under the responsibility of the application to
  * conform to the rules documented in
- * {@link com.sun.jdmk.remote.cascading#The_File_System_Analogy
- * com.sun.jdmk.remote.cascading} package documentation, section
+ * {@link com.hellblazer.jmx.cascading#The_File_System_Analogy
+ * com.hellblazer.jmx.cascading} package documentation, section
  * "The File System Analogy".
  * </p>
  * 
@@ -143,7 +143,7 @@ public interface CascadingServiceMBean {
      * {@link JMXConnectionNotification#FAILED JMXConnectionNotification.FAILED}
      * is emitted by the underlying JMX Remote Connection.
      **/
-    public final String            CASCADING_FAILED_NOTIFICATION  = "com.sun.jdmk.remote.cascading.failed";
+    public final String            CASCADING_FAILED_NOTIFICATION  = "com.hellblazer.jmx.cascading.failed";
 
     /**
      * The type of the <tt>JMXConnectionNotification</tt> emitted when a source
@@ -151,7 +151,7 @@ public interface CascadingServiceMBean {
      * 
      * @see #unmount
      **/
-    public final String            CASCADING_STOPPED_NOTIFICATION = "com.sun.jdmk.remote.cascading.stopped";
+    public final String            CASCADING_STOPPED_NOTIFICATION = "com.hellblazer.jmx.cascading.stopped";
 
     /**
      * Returns an array of current <var>mountPointIDs</var>.
@@ -234,7 +234,7 @@ public interface CascadingServiceMBean {
      *            is the responsibility of the application that uses the
      *            <tt>CascadingService</tt> to ensure the consistency of the
      *            mounting strategy - see
-     *            {@link com.sun.jdmk.remote.cascading#The_File_System_Analogy
+     *            {@link com.hellblazer.jmx.cascading#The_File_System_Analogy
      *            The File System Analogy}.
      *            <p>
      *            <b>Note:</b> A zero-length <var>targetPath</var> is treated as

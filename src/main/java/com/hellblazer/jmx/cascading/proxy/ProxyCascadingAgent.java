@@ -85,7 +85,7 @@ import com.hellblazer.jmx.cascading.MBeanServerConnectionWrapper;
  * MBean proxying.
  * <p>
  * Using this class directly is discouraged. You should envisage using the
- * {@link com.sun.jdmk.remote.cascading.CascadingService} instead.
+ * {@link com.hellblazer.jmx.cascading.CascadingService} instead.
  * <p>
  * A <tt>CascadingAgent</tt> is an MBean that is able to <i>mount</i> a partial
  * view of a <i>source MBeanServer</i> into a <i>target MBeanServer</i>. The
@@ -97,7 +97,7 @@ import com.hellblazer.jmx.cascading.MBeanServerConnectionWrapper;
  * <tt>ProxyCascadingAgent</tt> will register a {@link CascadingProxy} in the
  * target <tt>MBeanServer</tt>.
  * <p>
- * See {@link CascadingAgent} and {@link com.sun.jdmk.remote.cascading} for more
+ * See {@link CascadingAgent} and {@link com.hellblazer.jmx.cascading} for more
  * details on the cascading concepts.
  * 
  * @since Java DMK 5.1
@@ -276,7 +276,7 @@ public class ProxyCascadingAgent extends CascadingAgent {
      * constructor} that takes a <i>targetPath</i> and a <i>target
      * MBeanServer</i> instead.
      * <p>
-     * See {@link com.sun.jdmk.remote.cascading} description and
+     * See {@link com.hellblazer.jmx.cascading} description and
      * {@link CascadingAgent}.
      * 
      * @param sourceConnection
