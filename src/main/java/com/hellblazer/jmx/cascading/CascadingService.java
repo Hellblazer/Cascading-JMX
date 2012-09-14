@@ -60,6 +60,7 @@ import javax.management.MBeanNotificationInfo;
 import javax.management.MBeanRegistration;
 import javax.management.MBeanServer;
 import javax.management.MBeanServerConnection;
+import javax.management.MalformedObjectNameException;
 import javax.management.Notification;
 import javax.management.NotificationBroadcasterSupport;
 import javax.management.NotificationEmitter;
@@ -70,6 +71,9 @@ import javax.management.remote.JMXConnectionNotification;
 import javax.management.remote.JMXConnector;
 import javax.management.remote.JMXConnectorFactory;
 import javax.management.remote.JMXServiceURL;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.hellblazer.jmx.cascading.proxy.ProxyCascadingAgent;
 
@@ -137,6 +141,7 @@ import com.hellblazer.jmx.cascading.proxy.ProxyCascadingAgent;
 //
 public class CascadingService implements CascadingServiceMBean,
         NotificationEmitter, MBeanRegistration {
+    private final Logger log = LoggerFactory.getLogger(CascadingService.class);
 
     class MountPoint {
 
@@ -366,13 +371,16 @@ public class CascadingService implements CascadingServiceMBean,
                                                            mpt.mountPointID);
 
         try {
-
             mountMap.put(mpt.mountPointID, mpt);
             mpt.mount(sourceConnector, getTargetMBeanServer());
             return mpt.mountPointID;
 
         } catch (Exception x) {
-
+            if (log.isDebugEnabled()) {
+                log.debug(String.format("Exception mounting %s, %s, %s, %s, %s",
+                                        sourceURL, sourceMap, sourcePattern,
+                                        targetPath, mpt), x);
+            }
             try {
 
                 // This will close the sourceConnector if needed.
@@ -381,7 +389,10 @@ public class CascadingService implements CascadingServiceMBean,
                 mpt.unmount();
 
             } catch (Exception xx) {
-                // OK: drop it...
+                if (log.isDebugEnabled()) {
+                    log.debug(String.format("Error closing source connector %s",
+                                            mpt), xx);
+                }
             }
 
             // This is ugly...
@@ -710,5 +721,18 @@ public class CascadingService implements CascadingServiceMBean,
                 sourceConnector.close();
             }
         }
+    }
+
+    /* (non-Javadoc)
+     * @see com.hellblazer.jmx.cascading.CascadingServiceMBean#mount(java.lang.String, javax.management.ObjectName, java.lang.String)
+     */
+    @Override
+    public String mount(String sourceURL, String sourcePattern,
+                        String targetPath) throws IOException,
+                                          InstanceAlreadyExistsException,
+                                          MalformedObjectNameException {
+        JMXServiceURL url = new JMXServiceURL(sourceURL);
+        ObjectName name = new ObjectName(sourcePattern);
+        return mount(url, null, name, targetPath);
     }
 }
