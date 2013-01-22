@@ -136,6 +136,7 @@ public class LocalMBeanServerConnectionFactory implements
      * </p>
      * 
      */
+    @Override
     public void addConnectionNotificationListener(NotificationListener listener,
                                                   NotificationFilter filter,
                                                   Object handback) {
@@ -150,6 +151,7 @@ public class LocalMBeanServerConnectionFactory implements
      * 
      * @return the unique ID of this local connection.
      */
+    @Override
     public final String getConnectionId() throws IOException {
         return connectionId;
     }
@@ -162,6 +164,7 @@ public class LocalMBeanServerConnectionFactory implements
      * 
      * @return the local <tt>MBeanServerConnection</tt>.
      */
+    @Override
     public final MBeanServerConnection getMBeanServerConnection()
                                                                  throws IOException {
         return localConnection;
@@ -173,6 +176,7 @@ public class LocalMBeanServerConnectionFactory implements
      * they never emit notifications.
      * </p>
      */
+    @Override
     public void removeConnectionNotificationListener(NotificationListener listener)
                                                                                    throws ListenerNotFoundException {
         // localConnection are never broken etc..
@@ -184,6 +188,7 @@ public class LocalMBeanServerConnectionFactory implements
      * they never emit notifications.
      * </p>
      */
+    @Override
     public void removeConnectionNotificationListener(NotificationListener l,
                                                      NotificationFilter f,
                                                      Object handback)

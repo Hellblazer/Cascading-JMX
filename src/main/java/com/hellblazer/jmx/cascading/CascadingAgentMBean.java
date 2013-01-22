@@ -161,7 +161,7 @@ public interface CascadingAgentMBean {
      *         mounted in the target <tt>MBeanServer</tt>.
      * @see com.hellblazer.jmx.cascading
      **/
-    public String getTargetPath();
+    public String getNodeName();
 
     /**
      * Tests if the <CODE>CascadingAgent</CODE> is active.

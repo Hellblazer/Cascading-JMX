@@ -172,14 +172,14 @@ public class BasicMBeanServerConnectionFactory implements
     }
 
     // The underlying MBeanServerConnection. Lazy evaluation done by
-    // getMBeanServerConnection(); Access should protected by 
-    // synchronized() block. 
+    // getMBeanServerConnection(); Access should protected by
+    // synchronized() block.
     // Can be accessed by subclasses using getMBeanServerConnection();
     //
     private MBeanServerConnection                connection;
 
-    // JMXConnector. 
-    // Can be accessed - getJMXConnector()  by subclasses.
+    // JMXConnector.
+    // Can be accessed - getJMXConnector() by subclasses.
     //
     private final JMXConnector                   connector;
 
@@ -214,6 +214,7 @@ public class BasicMBeanServerConnectionFactory implements
         connection = null;
         emitter = new NotificationBroadcasterSupport();
         listener = new NotificationListener() {
+            @Override
             public void handleNotification(Notification n, Object handback) {
                 handleConnectionNotification(n, handback);
             }
@@ -226,7 +227,8 @@ public class BasicMBeanServerConnectionFactory implements
     }
 
     // MBeanServerConnectionFactory
-    // 
+    //
+    @Override
     public void addConnectionNotificationListener(NotificationListener listener,
                                                   NotificationFilter filter,
                                                   Object handback) {
@@ -234,7 +236,8 @@ public class BasicMBeanServerConnectionFactory implements
     }
 
     // MBeanServerConnectionFactory
-    // 
+    //
+    @Override
     public String getConnectionId() throws IOException {
         if (failed) {
             throw new IOException("connection already failed");
@@ -289,6 +292,7 @@ public class BasicMBeanServerConnectionFactory implements
      * @see JMXConnector#getMBeanServerConnection()
      * @see JMXConnector#getMBeanServerConnection(Subject)
      */
+    @Override
     public synchronized MBeanServerConnection getMBeanServerConnection()
                                                                         throws IOException {
         if (failed) {
@@ -301,14 +305,16 @@ public class BasicMBeanServerConnectionFactory implements
     }
 
     // MBeanServerConnectionFactory
-    // 
+    //
+    @Override
     public void removeConnectionNotificationListener(NotificationListener listener)
                                                                                    throws ListenerNotFoundException {
         emitter.removeNotificationListener(listener);
     }
 
     // MBeanServerConnectionFactory
-    // 
+    //
+    @Override
     public void removeConnectionNotificationListener(NotificationListener l,
                                                      NotificationFilter f,
                                                      Object handback)

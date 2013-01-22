@@ -271,25 +271,6 @@ public interface CascadingServiceMBean {
                                                                     InstanceAlreadyExistsException;
 
     /**
-     * Undo the mount operation identified by <var>mountPointID</var>. The
-     * specified <var>mountPointID</var> must be a mount point ID obtained from
-     * {@link #mount mount}.
-     * 
-     * @param mountPointID
-     *            A mount point ID previously obtained from {@link #mount mount}
-     *            .
-     * @return true if the given <var>mountPointID</var> was found and unmounted
-     *         by this invocation.
-     * @exception IOException
-     *                if the connection with the source <tt>MBeanServer</tt>
-     *                cannot be closed cleanly, or if the underlying
-     *                <tt>CascadingAgent</tt> fails to stop. See
-     *                {@link JMXConnector#close JMXConnector.close} and
-     *                {@link CascadingAgentMBean#stop CascadingAgentMBean.stop}.
-     **/
-    public boolean unmount(String mountPointID) throws IOException;
-
-    /**
      * Mounts a partial view of the source <tt>MBeanServer</tt> identified by
      * its <tt>JMXServiceURL</tt>.
      * 
@@ -325,16 +306,14 @@ public interface CascadingServiceMBean {
      *            element. A <tt>null</tt> sourcePattern is equivalent to the
      *            wildcard <tt>"*:*"</tt>.
      *            <p>
-     * @param targetPath
-     *            The <i>domain path</i> under which the source MBeans will be
-     *            mounted in the target <tt>MBeanServer</tt>.
+     * @param nodeName
+     *            The <i>cascadedNode</i> property value which will be added to
+     *            the the source MBeans' property list, producing the target
+     *            name for the <tt>MBeanServer</tt>.
      *            <p>
-     *            If this parameter is not <tt>null</tt>, all source MBean names
-     *            will be transformed in the target <tt>MBeanServer</tt> by
-     *            prefixing their domain name with the string
-     *            <tt><i>targetPath</i>+"/"</tt>. An MBean whose name is
-     *            <tt>"D:k1=v1,k2=v2"</tt> will thus be mounted as
-     *            <tt>"<i>targetPath</i>/D:k1=v1,k2=v2"</tt>.
+     *            An MBean whose name is <tt>"D:k1=v1,k2=v2"</tt> will thus be
+     *            mounted as
+     *            <tt>"<i>targetPath</i>/D:cascadedNode=nodeName,k1=v1,k2=v2"</tt>.
      *            <p>
      *            A <tt>null</tt> <var>targetPath</var> means that MBeans are
      *            mounted directly at the root of the hierarchy, that is, as if
@@ -343,20 +322,18 @@ public interface CascadingServiceMBean {
      *            the target <tt>MBeanServer</tt></b>.
      *            <p>
      *            Similarly, MBeans from different sources should not be mounted
-     *            under the same <var>targetPath</var>. Moreover, an application
+     *            under the same <var>nodeName</var>. Moreover, an application
      *            should not attempt to mount source MBeans under a
      *            <var>targetPath</var> that already contain MBeans in the
      *            target <tt>MBeanServer</tt>.
      *            <p>
-     *            However, this implementation does not enforce these rules: It
-     *            is the responsibility of the application that uses the
-     *            <tt>CascadingService</tt> to ensure the consistency of the
-     *            mounting strategy - see
-     *            {@link com.hellblazer.jmx.cascading#The_File_System_Analogy
-     *            The File System Analogy}.
+     *            However, our implementation does not enforce these rules: It
+     *            is the responsibility of the application creating the
+     *            <tt>CascadingAgent</tt> to ensure the consistency of the
+     *            mounting strategy.
      *            <p>
-     *            <b>Note:</b> A zero-length <var>targetPath</var> is treated as
-     *            a null <var>targetPath</var>.
+     *            <b>Note:</b> A zero-length <var>nodeName</var> is treated as a
+     *            null <var>nodeName</var>.
      *            <p>
      * @return A <var>mountPointID</var> identifying this mount operation. This
      *         mountPointID must be later used to call {@link #unmount}.
@@ -388,4 +365,23 @@ public interface CascadingServiceMBean {
                         String targetPath) throws IOException,
                                           InstanceAlreadyExistsException,
                                           MalformedObjectNameException;
+
+    /**
+     * Undo the mount operation identified by <var>mountPointID</var>. The
+     * specified <var>mountPointID</var> must be a mount point ID obtained from
+     * {@link #mount mount}.
+     * 
+     * @param mountPointID
+     *            A mount point ID previously obtained from {@link #mount mount}
+     *            .
+     * @return true if the given <var>mountPointID</var> was found and unmounted
+     *         by this invocation.
+     * @exception IOException
+     *                if the connection with the source <tt>MBeanServer</tt>
+     *                cannot be closed cleanly, or if the underlying
+     *                <tt>CascadingAgent</tt> fails to stop. See
+     *                {@link JMXConnector#close JMXConnector.close} and
+     *                {@link CascadingAgentMBean#stop CascadingAgentMBean.stop}.
+     **/
+    public boolean unmount(String mountPointID) throws IOException;
 }

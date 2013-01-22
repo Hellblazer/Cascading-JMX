@@ -54,7 +54,6 @@ import java.io.IOException;
 import java.lang.reflect.UndeclaredThrowableException;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.Set;
 
 import javax.management.InstanceAlreadyExistsException;
@@ -105,8 +104,7 @@ import com.hellblazer.jmx.cascading.MBeanServerConnectionWrapper;
 public class ProxyCascadingAgent extends CascadingAgent {
 
     /**
-     * A string describing the MBean state. A usual state transition sequence
-     * is:
+     * An enum describing the MBean state. A usual state transition sequence is:
      * 
      * <pre>
      * STOPPED -> STARTING -> STARTED -> SHUTTING_DOWN -> STOPPED
@@ -117,140 +115,49 @@ public class ProxyCascadingAgent extends CascadingAgent {
      * 
      * @see #isActive
      **/
-    final static class State {
+    static enum State {
         /**
-         * The <tt>CascadingAgent</tt> state is switched to "Starting" at the
-         * beginning of the <tt>start()</tt> method, and remains so as long as
-         * the <tt>start()</tt> method is in progress.
+         * The <tt>CascadingAgent</tt> state is switched to "ShuttingDown" at
+         * the beginning of the <tt>stop()</tt> method, and remains so as long
+         * as the <tt>stop()</tt> method is in progress.
          **/
-        public final static String STARTING      = "Starting";
+        SHUTTING_DOWN,
 
         /**
          * The <tt>CascadingAgent</tt> state is switched "Started" at the end of
          * the <tt>start()</tt> method, and remains so until the
          * <tt>CascadingAgent</tt> stops.
          **/
-        public final static String STARTED       = "Started";
+        STARTED,
 
         /**
-         * The <tt>CascadingAgent</tt> state is switched to "ShuttingDown" at
-         * the beginning of the <tt>stop()</tt> method, and remains so as long
-         * as the <tt>stop()</tt> method is in progress.
+         * The <tt>CascadingAgent</tt> state is switched to "Starting" at the
+         * beginning of the <tt>start()</tt> method, and remains so as long as
+         * the <tt>start()</tt> method is in progress.
          **/
-        public final static String SHUTTING_DOWN = "ShuttingDown";
+        STARTING,
 
         /**
          * The <tt>CascadingAgent</tt> state is switched "Stopped" at the end of
          * the <tt>stop()</tt> method, and remains so until the
          * <tt>CascadingAgent</tt> is started again.
          **/
-        public final static String STOPPED       = "Stopped";
+        STOPPED;
     }
 
-    /**
-     * Creates a <tt>ProxyCascadingAgent</tt> that will mount MBeans from a
-     * source <tt>MBeanServer</tt> under the given <var>targetPath</var>.
-     * 
-     * @param sourceConnection
-     *            An <tt>MBeanServerConnectionFactory</tt> providing connections
-     *            to the source (cascaded) <tt>MBeanServer</tt>.
-     *            <p>
-     *            The <tt>CascadingAgent</tt> will call
-     *            {@link MBeanServerConnectionFactory#getMBeanServerConnection()
-     *            sourceConnection.getMBeanServerConnection()} every time it
-     *            needs to access the subagent.
-     *            <p>
-     * @param sourcePattern
-     *            An <tt>ObjectName</tt> pattern that must be satisfied by the
-     *            <tt>ObjectName</tt>s of the source MBeans.
-     *            <p>
-     *            The sourcePattern is evaluated in the context of the source
-     *            <tt>MBeanServer</tt>. The source pattern is used to perform a
-     *            partial mount of the source <tt>MBeanServer</tt> in the target
-     *            <tt>MBeanServer</tt>. Only those MBeans that satisfy the
-     *            pattern will be mounted. The source pattern is thus a filter
-     *            element. A <tt>null</tt> sourcePattern is equivalent to the
-     *            wildcard <tt>"*:*"</tt>.
-     *            <p>
-     * @param sourceQuery
-     *            A <tt>QueryExp</tt> that must be satisfied by the source
-     *            MBeans.
-     *            <p>
-     *            The sourceQuery is evaluated in the context of the source
-     *            <tt>MBeanServer</tt>. <b>Using this functionality is
-     *            discouraged</b>. It is recommended to always pass a
-     *            <tt>null</tt> parameter. If however, you chose to pass a non
-     *            null <var>sourceQuery</var>, the given <tt>QueryExp</tt>
-     *            should not involve any properties or attributes that vary over
-     *            time. The evaluation of the <var>sourceQuery</var> against a
-     *            given MBean should be guaranteed to always consistently yield
-     *            the same result. Our implementation does not enforce this
-     *            constraint, but the behavior of the <tt>CascadingAgent</tt> in
-     *            the case where this constraint were not respected is
-     *            unspecified and could be unpredictable.
-     *            <p>
-     * @param targetPath
-     *            The <i>domain path</i> under which the source MBeans will be
-     *            mounted in the target <tt>MBeanServer</tt>.
-     *            <p>
-     *            If this parameter is not <tt>null</tt>, all source MBean names
-     *            will be transformed in the target <tt>MBeanServer</tt> by
-     *            prefixing their domain name with the string
-     *            <tt><i>targetPath</i>+"/"</tt>. An MBean whose name is
-     *            <tt>"D:k1=v1,k2=v2"</tt> will thus be mounted as
-     *            <tt>"<i>targetPath</i>/D:k1=v1,k2=v2"</tt>. <br>
-     *            <p>
-     *            A <tt>null</tt> <var>targetPath</var> means that MBeans are
-     *            mounted directly at the root of the hierarchy, that is, as if
-     *            they were local MBeans. <b>Using a null <i>targetPath</i> is
-     *            thus highly discouraged, as it could cause name conflicts in
-     *            the target <tt>MBeanServer</tt></b>.
-     *            <p>
-     *            Similarly, MBeans from different sources should not be mounted
-     *            under the same <var>targetPath</var>. Moreover, an application
-     *            should not attempt to mount source MBeans under a
-     *            <var>targetPath</var> that already contain MBeans in the
-     *            target <tt>MBeanServer</tt>.
-     *            <p>
-     *            However, our implementation does not enforce these rules: It
-     *            is the responsibility of the application creating the
-     *            <tt>CascadingAgent</tt> to ensure the consistency of the
-     *            mounting strategy.
-     *            <p>
-     *            <b>Note:</b> A zero-length <var>targetPath</var> is treated as
-     *            a null <var>targetPath</var>.
-     *            <p>
-     * @param description
-     *            A human readable string describing this
-     *            <tt>CascadingAgent</tt>.
-     *            <p>
-     * @exception IllegalArgumentException
-     *                if <var>targetPath</var> is not syntactically valid (e.g.
-     *                it contains wildcard characters).
-     **/
-    public ProxyCascadingAgent(MBeanServerConnectionFactory sourceConnection,
-                               ObjectName sourcePattern, QueryExp sourceQuery,
-                               String targetPath, MBeanServer targetMBS,
-                               String description) {
-        super(sourceConnection, sourcePattern, sourceQuery, targetPath,
-              targetMBS);
-        mbsNotifHandler = new NotificationListener() {
-            public void handleNotification(Notification notification,
-                                           Object handback) {
-                handleMBeanServerNotification(notification, handback);
-            }
-        };
-        mbeanList = new HashMap<ObjectName, Object>();
-        wrapper = new MBeanServerConnectionWrapper() {
-            protected MBeanServerConnection getMBeanServerConnection()
-                                                                      throws IOException {
-                return getConnectionFactory().getMBeanServerConnection();
-            }
-        };
-        state = State.STOPPED;
-        sequenceNumber = 0;
-        this.description = description;
-    }
+    private final static Logger                logger = LoggerFactory.getLogger(ProxyCascadingAgent.class);
+
+    private final String                       description;
+
+    private final HashMap<ObjectName, Object>  mbeanList;
+
+    private final NotificationListener         mbsNotifHandler;
+
+    private long                               sequenceNumber;
+
+    private State                              state;
+
+    private final MBeanServerConnectionWrapper wrapper;
 
     /**
      * <p>
@@ -329,8 +236,172 @@ public class ProxyCascadingAgent extends CascadingAgent {
              description);
     }
 
+    /**
+     * Creates a <tt>ProxyCascadingAgent</tt> that will mount MBeans from a
+     * source <tt>MBeanServer</tt> under the given <var>targetPath</var>.
+     * 
+     * @param sourceConnection
+     *            An <tt>MBeanServerConnectionFactory</tt> providing connections
+     *            to the source (cascaded) <tt>MBeanServer</tt>.
+     *            <p>
+     *            The <tt>CascadingAgent</tt> will call
+     *            {@link MBeanServerConnectionFactory#getMBeanServerConnection()
+     *            sourceConnection.getMBeanServerConnection()} every time it
+     *            needs to access the subagent.
+     *            <p>
+     * @param sourcePattern
+     *            An <tt>ObjectName</tt> pattern that must be satisfied by the
+     *            <tt>ObjectName</tt>s of the source MBeans.
+     *            <p>
+     *            The sourcePattern is evaluated in the context of the source
+     *            <tt>MBeanServer</tt>. The source pattern is used to perform a
+     *            partial mount of the source <tt>MBeanServer</tt> in the target
+     *            <tt>MBeanServer</tt>. Only those MBeans that satisfy the
+     *            pattern will be mounted. The source pattern is thus a filter
+     *            element. A <tt>null</tt> sourcePattern is equivalent to the
+     *            wildcard <tt>"*:*"</tt>.
+     *            <p>
+     * @param sourceQuery
+     *            A <tt>QueryExp</tt> that must be satisfied by the source
+     *            MBeans.
+     *            <p>
+     *            The sourceQuery is evaluated in the context of the source
+     *            <tt>MBeanServer</tt>. <b>Using this functionality is
+     *            discouraged</b>. It is recommended to always pass a
+     *            <tt>null</tt> parameter. If however, you chose to pass a non
+     *            null <var>sourceQuery</var>, the given <tt>QueryExp</tt>
+     *            should not involve any properties or attributes that vary over
+     *            time. The evaluation of the <var>sourceQuery</var> against a
+     *            given MBean should be guaranteed to always consistently yield
+     *            the same result. Our implementation does not enforce this
+     *            constraint, but the behavior of the <tt>CascadingAgent</tt> in
+     *            the case where this constraint were not respected is
+     *            unspecified and could be unpredictable.
+     *            <p>
+     * @param nodeName
+     *            The <i>cascadedNode</i> property value which will be added to
+     *            the the source MBeans' property list, producing the target
+     *            name for the <tt>MBeanServer</tt>.
+     *            <p>
+     *            An MBean whose name is <tt>"D:k1=v1,k2=v2"</tt> will thus be
+     *            mounted as
+     *            <tt>"<i>targetPath</i>/D:cascadedNode=nodeName,k1=v1,k2=v2"</tt>.
+     *            <p>
+     *            A <tt>null</tt> <var>targetPath</var> means that MBeans are
+     *            mounted directly at the root of the hierarchy, that is, as if
+     *            they were local MBeans. <b>Using a null <i>targetPath</i> is
+     *            thus highly discouraged, as it could cause name conflicts in
+     *            the target <tt>MBeanServer</tt></b>.
+     *            <p>
+     *            Similarly, MBeans from different sources should not be mounted
+     *            under the same <var>nodeName</var>. Moreover, an application
+     *            should not attempt to mount source MBeans under a
+     *            <var>targetPath</var> that already contain MBeans in the
+     *            target <tt>MBeanServer</tt>.
+     *            <p>
+     *            However, our implementation does not enforce these rules: It
+     *            is the responsibility of the application creating the
+     *            <tt>CascadingAgent</tt> to ensure the consistency of the
+     *            mounting strategy.
+     *            <p>
+     *            <b>Note:</b> A zero-length <var>nodeName</var> is treated as a
+     *            null <var>nodeName</var>.
+     *            <p>
+     * @param description
+     *            A human readable string describing this
+     *            <tt>CascadingAgent</tt>.
+     *            <p>
+     * @exception IllegalArgumentException
+     *                if <var>targetPath</var> is not syntactically valid (e.g.
+     *                it contains wildcard characters).
+     **/
+    public ProxyCascadingAgent(MBeanServerConnectionFactory sourceConnection,
+                               ObjectName sourcePattern, QueryExp sourceQuery,
+                               String nodeName, MBeanServer targetMBS,
+                               String description) {
+        super(sourceConnection, sourcePattern, sourceQuery, nodeName,
+              targetMBS);
+        mbsNotifHandler = new NotificationListener() {
+            @Override
+            public void handleNotification(Notification notification,
+                                           Object handback) {
+                handleMBeanServerNotification(notification, handback);
+            }
+        };
+        mbeanList = new HashMap<ObjectName, Object>();
+        wrapper = new MBeanServerConnectionWrapper() {
+            @Override
+            protected MBeanServerConnection getMBeanServerConnection()
+                                                                      throws IOException {
+                return getConnectionFactory().getMBeanServerConnection();
+            }
+        };
+        state = State.STOPPED;
+        sequenceNumber = 0;
+        this.description = description;
+    }
+
     // from CascadingAgentMBean
     //
+    @Override
+    public int getCascadedMBeanCount() {
+        return getLinkedCount();
+    }
+
+    // from CascadingAgentMBean
+    //
+    @Override
+    public Set<ObjectInstance> getCascadedMBeans() {
+        final Set<ObjectInstance> result = new HashSet<ObjectInstance>();
+        try {
+            final Set<ObjectInstance> sprutstc = getConnectionFactory().getMBeanServerConnection().queryMBeans(getPattern(),
+                                                                                                               getQuery());
+            for (ObjectInstance moi : sprutstc) {
+                if (isLinked(moi.getObjectName())) {
+                    result.add(moi);
+                }
+            }
+        } catch (Exception x) {
+            unexpectedException("getCascadedMBeans", getPattern(), x);
+        }
+        return result;
+    }
+
+    // from CascadingAgentMBean
+    //
+    @Override
+    public String getDescription() {
+        return description;
+    }
+
+    // from CascadingAgentMBean
+    //
+    @Override
+    public synchronized boolean isActive() {
+        return state.equals(State.STARTED);
+    }
+
+    /**
+     * Allows the MBean to perform any operations it needs before being
+     * unregistered by the MBean server. This implementation throws an
+     * <tt>IllegalStateException</tt> if the <tt>ProxyCascadingAgent</tt> is
+     * active.
+     * 
+     * @exception IllegalStateException
+     *                if the <tt>ProxyCascadingAgent</tt> is not stopped.
+     * @see CascadingAgent#preDeregister
+     */
+    @Override
+    public synchronized void preDeregister() throws java.lang.Exception {
+        if (!state.equals(State.STOPPED)) {
+            throw new IllegalStateException("ProxyCascadingAgent "
+                                            + "is still active.");
+        }
+    }
+
+    // from CascadingAgentMBean
+    //
+    @Override
     public synchronized void start() throws IOException {
         try {
             start(true);
@@ -428,19 +499,23 @@ public class ProxyCascadingAgent extends CascadingAgent {
      * @see #handleMBeanServerNotification
      * @see #preRegister
      **/
+    @Override
     public synchronized void start(boolean conflictAllowed) throws IOException,
                                                            InstanceAlreadyExistsException {
-        if (!state.equals(State.STOPPED))
+        if (!state.equals(State.STOPPED)) {
             throw new IllegalStateException("Can't start when state is: "
                                             + state);
+        }
 
         final MBeanServer mbs = getTargetMBeanServer();
-        if (mbs == null)
+        if (mbs == null) {
             throw new IllegalStateException("Can't start with no MBeanServer");
+        }
 
         state = State.STARTING;
-        if (logger.isDebugEnabled())
+        if (logger.isDebugEnabled()) {
             logger.debug(String.format("start %s", state));
+        }
         try {
             getConnectionFactory().getMBeanServerConnection().addNotificationListener(MBSDelegateObjectName,
                                                                                       mbsNotifHandler,
@@ -458,8 +533,9 @@ public class ProxyCascadingAgent extends CascadingAgent {
             throw io;
         } catch (Error e) {
             state = State.STOPPED;
-            if (logger.isDebugEnabled())
+            if (logger.isDebugEnabled()) {
                 logger.debug("start: failed to start", e);
+            }
             throw e;
         }
 
@@ -472,19 +548,21 @@ public class ProxyCascadingAgent extends CascadingAgent {
 
             final ObjectName[] names = new ObjectName[mbeans.size()];
             int count = 0;
-            for (Iterator<?> it = mbeans.iterator(); it.hasNext();) {
-                final ObjectName sourceName = (ObjectName) it.next();
+            for (Object name : mbeans) {
+                final ObjectName sourceName = (ObjectName) name;
                 final ObjectName targetName = getTargetName(sourceName);
                 if (mbs.isRegistered(targetName) && !conflictAllowed) {
                     nameConflictDetected("start", targetName);
                     throw new InstanceAlreadyExistsException(
                                                              String.valueOf(targetName));
-                } else
+                } else {
                     names[count++] = sourceName;
+                }
             }
 
-            for (int i = 0; i < count; i++)
+            for (int i = 0; i < count; i++) {
                 showMBean("start", names[i]);
+            }
 
         } catch (Throwable t) {
             failure = t;
@@ -492,12 +570,13 @@ public class ProxyCascadingAgent extends CascadingAgent {
 
         // Handle failure
         //
-        if (failure != null)
+        if (failure != null) {
             try {
                 state = State.SHUTTING_DOWN;
-                if (logger.isDebugEnabled())
+                if (logger.isDebugEnabled()) {
                     logger.debug(String.format("start: Failed to start: %s",
                                                state));
+                }
                 cleanup(false);
                 throw failure;
             } catch (IOException x) {
@@ -512,14 +591,17 @@ public class ProxyCascadingAgent extends CascadingAgent {
                 throw io;
             } finally {
                 state = State.STOPPED;
-                if (logger.isDebugEnabled())
+                if (logger.isDebugEnabled()) {
                     logger.debug(String.format("start: Not started: %s", state));
+                }
             }
+        }
 
         // Everything OK.
         state = State.STARTED;
-        if (logger.isDebugEnabled())
+        if (logger.isDebugEnabled()) {
             logger.debug(String.format("start %s", state));
+        }
     }
 
     /**
@@ -532,44 +614,9 @@ public class ProxyCascadingAgent extends CascadingAgent {
      * @exception IllegalStateException
      *                if the <tt>CascadingAgent</tt> is not started.
      **/
+    @Override
     public void stop() throws IOException {
         stop(false);
-    }
-
-    // from CascadingAgentMBean
-    //
-    public int getCascadedMBeanCount() {
-        return getLinkedCount();
-    }
-
-    // from CascadingAgentMBean
-    //
-    public Set<ObjectInstance> getCascadedMBeans() {
-        final Set<ObjectInstance> result = new HashSet<ObjectInstance>();
-        try {
-            final Set<ObjectInstance> sprutstc = getConnectionFactory().getMBeanServerConnection().queryMBeans(getPattern(),
-                                                                                                               getQuery());
-            for (Iterator<ObjectInstance> it = sprutstc.iterator(); it.hasNext();) {
-                final ObjectInstance moi = (ObjectInstance) it.next();
-                if (isLinked(moi.getObjectName()))
-                    result.add(moi);
-            }
-        } catch (Exception x) {
-            unexpectedException("getCascadedMBeans", getPattern(), x);
-        }
-        return result;
-    }
-
-    // from CascadingAgentMBean
-    //
-    public String getDescription() {
-        return description;
-    }
-
-    // from CascadingAgentMBean
-    //
-    public synchronized boolean isActive() {
-        return state.equals(State.STARTED);
     }
 
     /**
@@ -585,12 +632,14 @@ public class ProxyCascadingAgent extends CascadingAgent {
      **/
     public synchronized void update() throws IOException {
         if (!state.equals(State.STARTED)) {
-            if (logger.isDebugEnabled())
+            if (logger.isDebugEnabled()) {
                 logger.debug("update", "CascadingAgent " + state);
+            }
             return;
         }
-        if (logger.isDebugEnabled())
+        if (logger.isDebugEnabled()) {
             logger.debug("update", "CascadingAgent " + state);
+        }
         final ObjectName[] names = getLinkedSourceNames();
         final Set<?> sprutstc = new HashSet<Object>(
                                                     getConnectionFactory().getMBeanServerConnection().queryNames(getPattern(),
@@ -598,40 +647,268 @@ public class ProxyCascadingAgent extends CascadingAgent {
 
         final int len = names.length;
         final MBeanServer mbs = getTargetMBeanServer();
-        if (mbs == null)
+        if (mbs == null) {
             return;
+        }
         for (int i = 0; i < len; i++) {
             if (sprutstc.remove(names[i])) {
                 // Name found in cascaded MBS. show it.
                 showMBean("update", names[i]);
             } else {
-                // Name not found! hide it. 
+                // Name not found! hide it.
                 hideMBean("update", names[i]);
             }
         }
-        for (Iterator<?> it = sprutstc.iterator(); it.hasNext();) {
+        for (Object name : sprutstc) {
             // show remaining mbeans.
-            showMBean("update", (ObjectName) it.next());
+            showMBean("update", (ObjectName) name);
         }
-        if (logger.isDebugEnabled())
+        if (logger.isDebugEnabled()) {
             logger.debug("update", "CascadingAgent updated");
+        }
+    }
+
+    // If connectionDown is true - don't attempt to unregister listener
+    // from remote MBeanServerDelegate: it would fail anyway.
+    //
+    private synchronized void cleanup(boolean connectionDown) {
+        try {
+            try {
+                if (!connectionDown) {
+                    getConnectionFactory().getMBeanServerConnection().removeNotificationListener(MBSDelegateObjectName,
+                                                                                                 mbsNotifHandler,
+                                                                                                 null,
+                                                                                                 null);
+                }
+            } catch (Exception x) {
+                unexpectedCleanupException(MBSDelegateObjectName, x);
+            }
+            try {
+                disableConnectionNotifications();
+            } catch (Exception x) {
+                unexpectedCleanupException(null, x);
+            }
+            clearProxies();
+        } catch (Exception x) {
+            unexpectedCleanupException(null, x);
+        }
     }
 
     /**
-     * Allows the MBean to perform any operations it needs before being
-     * unregistered by the MBean server. This implementation throws an
-     * <tt>IllegalStateException</tt> if the <tt>ProxyCascadingAgent</tt> is
-     * active.
+     * Clears the list of proxies linked by that <tt>CascadingAgent</tt>.
+     * Returns an array of cascading proxy <tt>ObjectName</tt>s that must be
+     * deregistered from the cascading server. This method is called internally
+     * and is provided as a hook for subclasses. You should never call this
+     * method directly.
      * 
-     * @exception IllegalStateException
-     *                if the <tt>ProxyCascadingAgent</tt> is not stopped.
-     * @see CascadingAgent#preDeregister
-     */
-    public synchronized void preDeregister() throws java.lang.Exception {
-        if (!state.equals(State.STOPPED)) {
-            throw new IllegalStateException("ProxyCascadingAgent "
-                                            + "is still active.");
+     * @return The array of target proxy name that must be deleted from target
+     *         MBeanServer.
+     **/
+    private synchronized ObjectName[] clearLinks() {
+        final ObjectName[] keys = getLinkedSourceNames();
+        for (int i = 0; i < keys.length; i++) {
+            keys[i] = getTargetName(keys[i]);
         }
+        mbeanList.clear();
+        return keys;
+    }
+
+    private synchronized void clearProxies() {
+        try {
+            ObjectName[] names = clearLinks();
+            final MBeanServer mbs = getTargetMBeanServer();
+            if (mbs == null) {
+                return;
+            }
+            for (ObjectName name : names) {
+                try {
+                    mbs.unregisterMBean(name);
+                    if (logger.isTraceEnabled()) {
+                        logger.trace(String.format("clearProxies, Unregistered target proxy: %s",
+                                                   name));
+                    }
+                } catch (Exception x) {
+                    unexpectedCleanupException(name, x);
+                }
+            }
+        } catch (Exception x) {
+            unexpectedCleanupException(null, x);
+        }
+    }
+
+    /**
+     * Returns the target cascading proxy that is currently linked to the given
+     * source name. Returns null if no target proxy is linked to that source
+     * name.
+     * 
+     * @return The linked target proxy, if any.
+     **/
+    private synchronized Object getLinked(ObjectName sourceName) {
+        return mbeanList.get(sourceName);
+    }
+
+    /**
+     * Returns the number of source MBeans which are currently linked by this
+     * <tt>CascadingAgent</tt>.
+     * 
+     * @return The number of source MBeans which are currently mounted in the
+     *         target MBeanServer.
+     **/
+    private synchronized int getLinkedCount() {
+        return mbeanList.size();
+    }
+
+    /**
+     * Returns the <tt>ObjectName</tt>s of the source MBeans which are currently
+     * linked by this <tt>CascadingAgent</tt>.
+     * 
+     * @return The source MBeans names.
+     **/
+    private synchronized ObjectName[] getLinkedSourceNames() {
+        final ObjectName[] keys = new ObjectName[mbeanList.size()];
+        mbeanList.keySet().toArray(keys);
+        return keys;
+    }
+
+    /**
+     * Gets a target proxy for the specified source MBean. If the given
+     * sourceName is already linked, simply return the proxy returned by
+     * {@link #getLinked}. Otherwise, calls {@link #createProxy} to create a new
+     * <tt>CascadingProxy</tt>.
+     * 
+     * @param sourceName
+     *            The name of the source MBean.
+     * @param cf
+     *            The source <tt>MBeanServerConnectionFactory</tt> used to
+     *            obtain connections with the source <tt>MBeanServer</tt>.
+     * @return A cascading proxy for the given source name.
+     **/
+    private Object getProxy(ObjectName sourceName,
+                            MBeanServerConnectionFactory cf) {
+        final Object proxy = getLinked(sourceName);
+        if (proxy != null) {
+            return proxy;
+        }
+        if (logger.isTraceEnabled()) {
+            logger.trace(String.format("getProxy, create proxy for: %s",
+                                       sourceName));
+        }
+        return createProxy(sourceName, cf);
+    }
+
+    /**
+     * Apply the given <var>sourcePattern</var> and <var>sourceQuery</var> to
+     * the source MBean identified by <var>sourceName</var>.
+     * 
+     * @return true if the source MBean matches the sourcePattern and
+     *         sourceQuery, false if it doesn't - or if the sourceQuery couldn't
+     *         be applied (<tt>IOException</tt> raised etc...).
+     **/
+    private boolean isIncluded(ObjectName sourceName, ObjectName sourcePattern,
+                               QueryExp sourceQuery) {
+        // match the sourcePattern
+        //
+        try {
+            if (sourcePattern != null && !sourcePattern.apply(sourceName)) {
+                return false;
+            }
+
+            // We can't simly do: if (sourceQuery == null) return true;
+            // we must verify that this CascadingAgent has the permissions
+            // to access the proxied MBean...
+            //
+            return wrapper.queryNames(sourceName, sourceQuery).size() == 1;
+        } catch (Exception x) {
+            unexpectedException("mustCascade", sourceName, x);
+        }
+        return false;
+    }
+
+    /**
+     * Tell whether the given source MBean is currently linked by that cascading
+     * agent.
+     * 
+     * @param sourceName
+     *            The name of the source MBean.
+     * @return true if that name is linked ({@link #link} was called.)
+     **/
+    private synchronized boolean isLinked(ObjectName sourceName) {
+        return mbeanList.get(sourceName) != null;
+    }
+
+    /**
+     * Records the link being made between a source MBean name and a Cascading
+     * Proxy. This method is called internally and is provided as a hook for
+     * subclasses. You should never call this method directly.
+     * 
+     * @param sourceName
+     *            The name of the source MBean.
+     * @param targetProxy
+     *            The cascading proxy that will be registered for that source
+     *            MBean in the target MBeanServer.
+     **/
+    private synchronized void link(ObjectName sourceName, Object targetProxy) {
+        mbeanList.put(sourceName, targetProxy);
+    }
+
+    // If connectionDown is true - don't attempt to unregister listener
+    // from remote MBeanServerDelegate: it would fail anyway.
+    //
+    private synchronized void stop(boolean connectionDown) throws IOException {
+        if (state.equals(State.STOPPED)) {
+            if (logger.isDebugEnabled()) {
+                logger.debug(String.format("stop, Already: %s ", state));
+            }
+            return;
+        }
+        if (!state.equals(State.STARTED)) {
+            throw new IllegalStateException("Can't stop when state is: "
+                                            + state);
+        }
+        state = State.SHUTTING_DOWN;
+        if (logger.isDebugEnabled()) {
+            logger.debug(String.format("stop: %s", state));
+        }
+        try {
+            cleanup(connectionDown);
+        } finally {
+            state = State.STOPPED;
+            if (logger.isDebugEnabled()) {
+                logger.debug(String.format("stop: %s", state));
+            }
+        }
+    }
+
+    // This is a hack: this method is called when
+    // JMXConnectionNotification.CLOSED is received.
+    // It calls getDefaultDomain() in order to check whether the connection
+    // is permanently closed - if so, it calls stop(true);
+    //
+    private void stopIfClosed() throws IOException {
+        if (!state.equals(State.STARTED)) {
+            return;
+        }
+        try {
+            getConnectionFactory().getMBeanServerConnection().getDefaultDomain();
+            return;
+        } catch (IOException x) {
+            // OK: really failed...
+        } catch (Exception x) {
+            // OK: Handle this as failed...
+        }
+        stop(true);
+    }
+
+    /**
+     * Deletes the link between a source MBean name and a target Cascading
+     * Proxy. This method is called internally and is provided as a hook for
+     * subclasses. You should never call this method directly.
+     * 
+     * @param sourceName
+     *            The name of the source MBean.
+     **/
+    private synchronized void unlink(ObjectName sourceName) {
+        mbeanList.remove(sourceName);
     }
 
     /**
@@ -691,13 +968,15 @@ public class ProxyCascadingAgent extends CascadingAgent {
      * </ul>
      * 
      **/
+    @Override
     protected void handleJMXConnectionNotification(Notification n,
                                                    Object handback) {
         final String nt = n.getType();
         try {
             synchronized (this) {
-                if (!state.equals(State.STARTED))
+                if (!state.equals(State.STARTED)) {
                     return;
+                }
                 if (JMXConnectionNotification.OPENED.equals(nt)
                     || JMXConnectionNotification.NOTIFS_LOST.equals(nt)) {
                     update();
@@ -778,6 +1057,123 @@ public class ProxyCascadingAgent extends CascadingAgent {
     }
 
     /**
+     * Increments and returns this object's notification sequence number.
+     **/
+    protected final synchronized long newSequenceNumber() {
+        return sequenceNumber++;
+    }
+
+    /**
+     * Returns the <tt>ObjectName</tt> of the cascading proxy proxying the
+     * source MBean identified by the given sourceName.
+     * 
+     * @param sourceName
+     *            The source MBean name.
+     * @return The target MBean name.
+     **/
+    ObjectName getTargetName(ObjectName sourceName) {
+        final String path = getNodeName();
+        if (path == null || path.length() == 0) {
+            return sourceName;
+        }
+        try {
+            final String domain = sourceName.getDomain();
+            final String list = sourceName.getKeyPropertyListString();
+            final String targetName = String.format("%s : %s = %s , %s",
+                                                    domain,
+                                                    CASCADED_NODE_PROPERTY_NAME,
+                                                    path, list);
+            return ObjectName.getInstance(targetName);
+        } catch (MalformedObjectNameException x) {
+            logger.error(String.format("Cannot crreate transformed source name %s",
+                                       sourceName), x);
+            return sourceName;
+        }
+    }
+
+    /**
+     * Hides a source (cascaded) MBean by unregistering the
+     * <tt>CascadingProxy</tt> for that MBean from the target MBeanServer.
+     * <p>
+     * This method does nothing if the <tt>CascadingAgent</tt> is not started,
+     * or not starting, or if no proxy is registered for that source MBean.
+     * </p>
+     * 
+     * <p>
+     * If an exception is raised while attempting to perform this operation,
+     * this method calls {@link #unexpectedException
+     * unexpectedException(operation,sourceName,exception)}.
+     * 
+     * @param operation
+     *            The notification/method name from which this operation was
+     *            triggered. This could be one of:
+     *            <ul>
+     *            <li>{@link #update "update"} </li> <li>or
+     *            {@link MBeanServerNotification#UNREGISTRATION_NOTIFICATION}
+     *            </li>
+     *            </ul>
+     * @param sourceName
+     *            Name of the source MBean in the source MBeanServer.
+     **/
+    // * <p>This method calls {@link #getTargetName} in order to obtain
+    // * the name with which the cascading proxy was registered.</p>
+    // *
+    synchronized void hideMBean(String operation, ObjectName sourceName) {
+        final MBeanServer srv = getTargetMBeanServer();
+        if (srv == null) {
+            return;
+        }
+        if (state.equals(State.STOPPED)) {
+            return;
+        }
+        if (state.equals(State.SHUTTING_DOWN)) {
+            return;
+        }
+
+        try {
+            if (isLinked(sourceName)) {
+                final ObjectName targetName = getTargetName(sourceName);
+                srv.unregisterMBean(targetName);
+                if (logger.isTraceEnabled()) {
+                    logger.trace(String.format("operation: %s Unregistered proxy: %s for %s",
+                                               operation, targetName,
+                                               sourceName));
+                }
+                unlink(sourceName);
+            }
+        } catch (InstanceNotFoundException x) {
+            // Already removed? that's strange, but hell, that's
+            // what we wanted anyway
+            // ==> should log something...
+            return;
+        } catch (Exception x) {
+            // no good: log something.
+            // possibly with a given Exception Handler?
+            unexpectedException(operation, sourceName, x);
+            return;
+        }
+    }
+
+    /**
+     * Called when a name conflict is detected while trying to register a
+     * cascading proxy. Subclasses should redefine this method if they need to
+     * implement some special behavior (logging etc...).
+     * 
+     * @param operation
+     *            The name of the operation from which this method was called
+     *            ("start", "update" or
+     *            {@link MBeanServerNotification#UNREGISTRATION_NOTIFICATION
+     *            MBeanServerNotification.UNREGISTRATION_NOTIFICATION})
+     * @param targetName
+     *            The <tt>ObjectName</tt> of the cascading proxy that couldn't
+     *            be created.
+     **/
+    void nameConflictDetected(String operation, ObjectName targetName) {
+        logger.debug(String.format("operation %s, Name conflict detected for %s",
+                                   operation, targetName));
+    }
+
+    /**
      * Shows a source MBean by registering a <tt>CascadingProxy</tt> for that
      * MBean in the target MBeanServer.
      * <p>
@@ -815,21 +1211,25 @@ public class ProxyCascadingAgent extends CascadingAgent {
     // * the name with which the cascading proxy will be registered.</p>
     // *
     synchronized void showMBean(String operation, ObjectName sourceName) {
-        if (state.equals(State.STOPPED))
+        if (state.equals(State.STOPPED)) {
             return;
-        if (state.equals(State.SHUTTING_DOWN))
+        }
+        if (state.equals(State.SHUTTING_DOWN)) {
             return;
+        }
 
         final MBeanServer srv = getTargetMBeanServer();
-        if (srv == null)
+        if (srv == null) {
             return;
+        }
 
         try {
 
             final ObjectName targetName = getTargetName(sourceName);
 
-            if (isLinked(sourceName) && srv.isRegistered(targetName))
+            if (isLinked(sourceName) && srv.isRegistered(targetName)) {
                 return;
+            }
 
             final Object proxy = getProxy(sourceName, getConnectionFactory());
 
@@ -837,10 +1237,11 @@ public class ProxyCascadingAgent extends CascadingAgent {
             try {
                 // Register the proxy locally
                 srv.registerMBean(proxy, targetName);
-                if (logger.isTraceEnabled())
+                if (logger.isTraceEnabled()) {
                     logger.trace(String.format("operation %s, Registered proxy: %s for %s ",
                                                operation, targetName,
                                                sourceName));
+                }
             } catch (InstanceAlreadyExistsException x) {
                 unlink(sourceName);
                 nameConflictDetected(operation, targetName);
@@ -860,62 +1261,25 @@ public class ProxyCascadingAgent extends CascadingAgent {
     }
 
     /**
-     * Hides a source (cascaded) MBean by unregistering the
-     * <tt>CascadingProxy</tt> for that MBean from the target MBeanServer.
-     * <p>
-     * This method does nothing if the <tt>CascadingAgent</tt> is not started,
-     * or not starting, or if no proxy is registered for that source MBean.
-     * </p>
+     * Called when an unexpected exception is raised (<tt>IOException</tt>
+     * etc...) while performing stopping the <tt>CascadingAgent</tt> (
+     * <tt>stop()</tt> called, <tt>JMXConnectionNotification.FAILED</tt>
+     * received). Subclasses should redefine this method if they need to
+     * implement some special behavior (logging etc...).
      * 
-     * <p>
-     * If an exception is raised while attempting to perform this operation,
-     * this method calls {@link #unexpectedException
-     * unexpectedException(operation,sourceName,exception)}.
-     * 
-     * @param operation
-     *            The notification/method name from which this operation was
-     *            triggered. This could be one of:
-     *            <ul>
-     *            <li>{@link #update "update"} </li> <li>or
-     *            {@link MBeanServerNotification#UNREGISTRATION_NOTIFICATION}
-     *            </li>
-     *            </ul>
-     * @param sourceName
-     *            Name of the source MBean in the source MBeanServer.
+     * @param targetName
+     *            The <tt>ObjectName</tt> of the cascading proxy for which the
+     *            exception was raised. This name is interpreted in the context
+     *            of the target MBeanServer. If no particular MBean was involved
+     *            in the operation that caused the exception to be raised, then
+     *            this parameter can be null.
+     * @param x
+     *            The exception.
      **/
-    // * <p>This method calls {@link #getTargetName} in order to obtain
-    // * the name with which the cascading proxy was registered.</p>
-    // *
-    synchronized void hideMBean(String operation, ObjectName sourceName) {
-        final MBeanServer srv = getTargetMBeanServer();
-        if (srv == null)
-            return;
-        if (state.equals(State.STOPPED))
-            return;
-        if (state.equals(State.SHUTTING_DOWN))
-            return;
-
-        try {
-            if (isLinked(sourceName)) {
-                final ObjectName targetName = getTargetName(sourceName);
-                srv.unregisterMBean(targetName);
-                if (logger.isTraceEnabled())
-                    logger.trace(String.format("operation: %s Unregistered proxy: %s for %s",
-                                               operation, targetName,
-                                               sourceName));
-                unlink(sourceName);
-            }
-        } catch (InstanceNotFoundException x) {
-            // Already removed? that's strange, but hell, that's
-            // what we wanted anyway
-            // ==> should log something...
-            return;
-        } catch (Exception x) {
-            // no good: log something.
-            // possibly with a given Exception Handler?
-            unexpectedException(operation, sourceName, x);
-            return;
-        }
+    void unexpectedCleanupException(ObjectName targetName, Exception x) {
+        logger.debug("cleanup", "Unexpected exception while handling "
+                                + targetName + ": " + x);
+        logger.trace("cleanup", x);
     }
 
     /**
@@ -942,317 +1306,4 @@ public class ProxyCascadingAgent extends CascadingAgent {
                                    operation, name), x);
         logger.trace(operation, x);
     }
-
-    /**
-     * Called when an unexpected exception is raised (<tt>IOException</tt>
-     * etc...) while performing stopping the <tt>CascadingAgent</tt> (
-     * <tt>stop()</tt> called, <tt>JMXConnectionNotification.FAILED</tt>
-     * received). Subclasses should redefine this method if they need to
-     * implement some special behavior (logging etc...).
-     * 
-     * @param targetName
-     *            The <tt>ObjectName</tt> of the cascading proxy for which the
-     *            exception was raised. This name is interpreted in the context
-     *            of the target MBeanServer. If no particular MBean was involved
-     *            in the operation that caused the exception to be raised, then
-     *            this parameter can be null.
-     * @param x
-     *            The exception.
-     **/
-    void unexpectedCleanupException(ObjectName targetName, Exception x) {
-        logger.debug("cleanup", "Unexpected exception while handling "
-                                + targetName + ": " + x);
-        logger.trace("cleanup", x);
-    }
-
-    /**
-     * Called when a name conflict is detected while trying to register a
-     * cascading proxy. Subclasses should redefine this method if they need to
-     * implement some special behavior (logging etc...).
-     * 
-     * @param operation
-     *            The name of the operation from which this method was called
-     *            ("start", "update" or
-     *            {@link MBeanServerNotification#UNREGISTRATION_NOTIFICATION
-     *            MBeanServerNotification.UNREGISTRATION_NOTIFICATION})
-     * @param targetName
-     *            The <tt>ObjectName</tt> of the cascading proxy that couldn't
-     *            be created.
-     **/
-    void nameConflictDetected(String operation, ObjectName targetName) {
-        logger.debug(String.format("operation %s, Name conflict detected for %s",
-                                   operation, targetName));
-    }
-
-    /**
-     * Increments and returns this object's notification sequence number.
-     **/
-    protected final synchronized long newSequenceNumber() {
-        return sequenceNumber++;
-    }
-
-    /**
-     * Returns the <tt>ObjectName</tt> of the cascading proxy proxying the
-     * source MBean identified by the given sourceName.
-     * 
-     * @param sourceName
-     *            The source MBean name.
-     * @return The target MBean name.
-     **/
-    ObjectName getTargetName(ObjectName sourceName) {
-        final String path = getTargetPath();
-        if (path == null || path.length() == 0)
-            return sourceName;
-        try {
-            final String domain = sourceName.getDomain();
-            final String list = sourceName.getKeyPropertyListString();
-            final String targetName = path + "/" + domain + ":" + list;
-            return ObjectName.getInstance(targetName);
-        } catch (MalformedObjectNameException x) {
-            logger.error(String.format("Cannot crreate transformed source name %s",
-                                       sourceName), x);
-            return sourceName;
-        }
-    }
-
-    /**
-     * Gets a target proxy for the specified source MBean. If the given
-     * sourceName is already linked, simply return the proxy returned by
-     * {@link #getLinked}. Otherwise, calls {@link #createProxy} to create a new
-     * <tt>CascadingProxy</tt>.
-     * 
-     * @param sourceName
-     *            The name of the source MBean.
-     * @param cf
-     *            The source <tt>MBeanServerConnectionFactory</tt> used to
-     *            obtain connections with the source <tt>MBeanServer</tt>.
-     * @return A cascading proxy for the given source name.
-     **/
-    private Object getProxy(ObjectName sourceName,
-                            MBeanServerConnectionFactory cf) {
-        final Object proxy = getLinked(sourceName);
-        if (proxy != null)
-            return proxy;
-        if (logger.isTraceEnabled())
-            logger.trace(String.format("getProxy, create proxy for: %s",
-                                       sourceName));
-        return createProxy(sourceName, cf);
-    }
-
-    // This is a hack: this method is called when 
-    // JMXConnectionNotification.CLOSED is received. 
-    // It calls getDefaultDomain() in order to check whether the connection
-    // is permanently closed - if so, it calls stop(true);
-    //
-    private void stopIfClosed() throws IOException {
-        if (!state.equals(State.STARTED))
-            return;
-        try {
-            getConnectionFactory().getMBeanServerConnection().getDefaultDomain();
-            return;
-        } catch (IOException x) {
-            // OK: really failed...
-        } catch (Exception x) {
-            // OK: Handle this as failed...
-        }
-        stop(true);
-    }
-
-    // If connectionDown is true - don't attempt to unregister listener
-    // from remote MBeanServerDelegate: it would fail anyway.
-    //
-    private synchronized void stop(boolean connectionDown) throws IOException {
-        if (state.equals(State.STOPPED)) {
-            if (logger.isDebugEnabled())
-                logger.debug(String.format("stop, Already: %s ", state));
-            return;
-        }
-        if (!state.equals(State.STARTED))
-            throw new IllegalStateException("Can't stop when state is: "
-                                            + state);
-        state = State.SHUTTING_DOWN;
-        if (logger.isDebugEnabled())
-            logger.debug(String.format("stop: %s", state));
-        try {
-            cleanup(connectionDown);
-        } finally {
-            state = State.STOPPED;
-            if (logger.isDebugEnabled())
-                logger.debug(String.format("stop: %s", state));
-        }
-    }
-
-    // If connectionDown is true - don't attempt to unregister listener
-    // from remote MBeanServerDelegate: it would fail anyway.
-    //
-    private synchronized void cleanup(boolean connectionDown) {
-        try {
-            try {
-                if (!connectionDown)
-                    getConnectionFactory().getMBeanServerConnection().removeNotificationListener(MBSDelegateObjectName,
-                                                                                                 mbsNotifHandler,
-                                                                                                 null,
-                                                                                                 null);
-            } catch (Exception x) {
-                unexpectedCleanupException(MBSDelegateObjectName, x);
-            }
-            try {
-                disableConnectionNotifications();
-            } catch (Exception x) {
-                unexpectedCleanupException(null, x);
-            }
-            clearProxies();
-        } catch (Exception x) {
-            unexpectedCleanupException(null, x);
-        }
-    }
-
-    private synchronized void clearProxies() {
-        try {
-            ObjectName[] names = clearLinks();
-            final MBeanServer mbs = getTargetMBeanServer();
-            if (mbs == null)
-                return;
-            for (int i = 0; i < names.length; i++) {
-                try {
-                    mbs.unregisterMBean(names[i]);
-                    if (logger.isTraceEnabled())
-                        logger.trace(String.format("clearProxies, Unregistered target proxy: %s",
-                                                   names[i]));
-                } catch (Exception x) {
-                    unexpectedCleanupException(names[i], x);
-                }
-            }
-        } catch (Exception x) {
-            unexpectedCleanupException(null, x);
-        }
-    }
-
-    /**
-     * Records the link being made between a source MBean name and a Cascading
-     * Proxy. This method is called internally and is provided as a hook for
-     * subclasses. You should never call this method directly.
-     * 
-     * @param sourceName
-     *            The name of the source MBean.
-     * @param targetProxy
-     *            The cascading proxy that will be registered for that source
-     *            MBean in the target MBeanServer.
-     **/
-    private synchronized void link(ObjectName sourceName, Object targetProxy) {
-        mbeanList.put(sourceName, targetProxy);
-    }
-
-    /**
-     * Deletes the link between a source MBean name and a target Cascading
-     * Proxy. This method is called internally and is provided as a hook for
-     * subclasses. You should never call this method directly.
-     * 
-     * @param sourceName
-     *            The name of the source MBean.
-     **/
-    private synchronized void unlink(ObjectName sourceName) {
-        mbeanList.remove(sourceName);
-    }
-
-    /**
-     * Clears the list of proxies linked by that <tt>CascadingAgent</tt>.
-     * Returns an array of cascading proxy <tt>ObjectName</tt>s that must be
-     * deregistered from the cascading server. This method is called internally
-     * and is provided as a hook for subclasses. You should never call this
-     * method directly.
-     * 
-     * @return The array of target proxy name that must be deleted from target
-     *         MBeanServer.
-     **/
-    private synchronized ObjectName[] clearLinks() {
-        final ObjectName[] keys = getLinkedSourceNames();
-        for (int i = 0; i < keys.length; i++) {
-            keys[i] = getTargetName(keys[i]);
-        }
-        mbeanList.clear();
-        return keys;
-    }
-
-    /**
-     * Tell whether the given source MBean is currently linked by that cascading
-     * agent.
-     * 
-     * @param sourceName
-     *            The name of the source MBean.
-     * @return true if that name is linked ({@link #link} was called.)
-     **/
-    private synchronized boolean isLinked(ObjectName sourceName) {
-        return (mbeanList.get(sourceName) != null);
-    }
-
-    /**
-     * Returns the target cascading proxy that is currently linked to the given
-     * source name. Returns null if no target proxy is linked to that source
-     * name.
-     * 
-     * @return The linked target proxy, if any.
-     **/
-    private synchronized Object getLinked(ObjectName sourceName) {
-        return mbeanList.get(sourceName);
-    }
-
-    /**
-     * Returns the number of source MBeans which are currently linked by this
-     * <tt>CascadingAgent</tt>.
-     * 
-     * @return The number of source MBeans which are currently mounted in the
-     *         target MBeanServer.
-     **/
-    private synchronized int getLinkedCount() {
-        return mbeanList.size();
-    }
-
-    /**
-     * Returns the <tt>ObjectName</tt>s of the source MBeans which are currently
-     * linked by this <tt>CascadingAgent</tt>.
-     * 
-     * @return The source MBeans names.
-     **/
-    private synchronized ObjectName[] getLinkedSourceNames() {
-        final ObjectName[] keys = new ObjectName[mbeanList.size()];
-        mbeanList.keySet().toArray(keys);
-        return keys;
-    }
-
-    /**
-     * Apply the given <var>sourcePattern</var> and <var>sourceQuery</var> to
-     * the source MBean identified by <var>sourceName</var>.
-     * 
-     * @return true if the source MBean matches the sourcePattern and
-     *         sourceQuery, false if it doesn't - or if the sourceQuery couldn't
-     *         be applied (<tt>IOException</tt> raised etc...).
-     **/
-    private boolean isIncluded(ObjectName sourceName, ObjectName sourcePattern,
-                               QueryExp sourceQuery) {
-        // match the sourcePattern
-        //
-        try {
-            if (sourcePattern != null && !(sourcePattern.apply(sourceName)))
-                return false;
-
-            // We can't simly do: if (sourceQuery == null) return true;
-            // we must verify that this CascadingAgent has the permissions
-            // to access the proxied MBean...
-            //
-            return (wrapper.queryNames(sourceName, sourceQuery).size() == 1);
-        } catch (Exception x) {
-            unexpectedException("mustCascade", sourceName, x);
-        }
-        return false;
-    }
-
-    private final NotificationListener         mbsNotifHandler;
-    private final HashMap<ObjectName, Object>  mbeanList;
-    private final MBeanServerConnectionWrapper wrapper;
-    private final String                       description;
-    private String                             state;
-    private long                               sequenceNumber;
-
-    private final static Logger                logger = LoggerFactory.getLogger(ProxyCascadingAgent.class);
 }

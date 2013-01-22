@@ -143,6 +143,7 @@ public abstract class CascadingAgent implements MBeanRegistration,
             return enabled;
         }
 
+        @Override
         public void handleNotification(Notification notification,
                                        Object handback) {
             if (enabled()) {
@@ -156,6 +157,12 @@ public abstract class CascadingAgent implements MBeanRegistration,
      * <tt>MBeanServerDelegate</tt> MBean.
      **/
     public final static ObjectName               MBSDelegateObjectName;
+
+    /**
+     * the property name that is added to distinguish cascaded nodes from each
+     * other
+     */
+    public static final String                   CASCADED_NODE_PROPERTY_NAME    = "cascadedNode";
 
     private static final String[]                jmxConnectionNotificationTypes = {
             JMXConnectionNotification.OPENED, JMXConnectionNotification.CLOSED,
@@ -203,7 +210,7 @@ public abstract class CascadingAgent implements MBeanRegistration,
 
     private final MBeanServer                    targetMBS;
 
-    private final String                         targetPath;
+    private final String                         nodeName;
 
     /**
      * Construct a new <tt>CascadingAgent</tt> MBean.
@@ -246,16 +253,14 @@ public abstract class CascadingAgent implements MBeanRegistration,
      *            the case where this constraint were not respected is
      *            unspecified and could be unpredictable.
      *            <p>
-     * @param targetPath
-     *            The <i>domain path</i> under which the source MBeans will be
-     *            mounted in the target <tt>MBeanServer</tt>.
+     * @param nodeName
+     *            The <i>cascadedNode</i> property value which will be added to
+     *            the the source MBeans' property list, producing the target
+     *            name for the <tt>MBeanServer</tt>.
      *            <p>
-     *            If this parameter is not <tt>null</tt>, all source MBean names
-     *            will be transformed in the target <tt>MBeanServer</tt> by
-     *            prefixing their domain name with the string
-     *            <tt><i>targetPath</i>+"/"</tt>. An MBean whose name is
-     *            <tt>"D:k1=v1,k2=v2"</tt> will thus be mounted as
-     *            <tt>"<i>targetPath</i>/D:k1=v1,k2=v2"</tt>.
+     *            An MBean whose name is <tt>"D:k1=v1,k2=v2"</tt> will thus be
+     *            mounted as
+     *            <tt>"<i>targetPath</i>/D:cascadedNode=nodeName,k1=v1,k2=v2"</tt>.
      *            <p>
      *            A <tt>null</tt> <var>targetPath</var> means that MBeans are
      *            mounted directly at the root of the hierarchy, that is, as if
@@ -264,7 +269,7 @@ public abstract class CascadingAgent implements MBeanRegistration,
      *            the target <tt>MBeanServer</tt></b>.
      *            <p>
      *            Similarly, MBeans from different sources should not be mounted
-     *            under the same <var>targetPath</var>. Moreover, an application
+     *            under the same <var>nodeName</var>. Moreover, an application
      *            should not attempt to mount source MBeans under a
      *            <var>targetPath</var> that already contain MBeans in the
      *            target <tt>MBeanServer</tt>.
@@ -274,8 +279,8 @@ public abstract class CascadingAgent implements MBeanRegistration,
      *            <tt>CascadingAgent</tt> to ensure the consistency of the
      *            mounting strategy.
      *            <p>
-     *            <b>Note:</b> A zero-length <var>targetPath</var> is treated as
-     *            a null <var>targetPath</var>.
+     *            <b>Note:</b> A zero-length <var>nodeName</var> is treated as a
+     *            null <var>nodeName</var>.
      *            <p>
      * @param targetMBS
      *            The <i>target MBeanServer</i> in which the source MBeans will
@@ -291,12 +296,12 @@ public abstract class CascadingAgent implements MBeanRegistration,
      **/
     protected CascadingAgent(MBeanServerConnectionFactory sourceConnection,
                              ObjectName sourcePattern, QueryExp sourceQuery,
-                             String targetPath, MBeanServer targetMBS) {
-        if (targetPath != null && targetPath.length() != 0) {
+                             String nodeName, MBeanServer targetMBS) {
+        if (nodeName != null && nodeName.length() != 0) {
             try {
-                if (ObjectName.getInstance(targetPath + "/D:k=v").isPattern()) {
+                if (ObjectName.getInstance(nodeName + "/D:k=v").isPattern()) {
                     throw new IllegalArgumentException("targetPath `"
-                                                       + targetPath
+                                                       + nodeName
                                                        + "' contains reserved "
                                                        + "`*' or `?' "
                                                        + "characters");
@@ -304,13 +309,13 @@ public abstract class CascadingAgent implements MBeanRegistration,
             } catch (MalformedObjectNameException x) {
                 final IllegalArgumentException iae = new IllegalArgumentException(
                                                                                   "targetPath `"
-                                                                                          + targetPath
+                                                                                          + nodeName
                                                                                           + "' is not valid",
                                                                                   x);
                 throw iae;
             }
         } else {
-            targetPath = null;
+            nodeName = null;
         }
 
         connectionFactory = sourceConnection;
@@ -325,12 +330,13 @@ public abstract class CascadingAgent implements MBeanRegistration,
         };
         this.sourcePattern = sourcePattern;
         this.sourceQuery = sourceQuery;
-        this.targetPath = targetPath;
+        this.nodeName = nodeName;
         this.targetMBS = targetMBS;
     }
 
     // from NotificationEmitter
     //
+    @Override
     public void addNotificationListener(NotificationListener listener,
                                         NotificationFilter filter,
                                         Object handback)
@@ -340,12 +346,14 @@ public abstract class CascadingAgent implements MBeanRegistration,
 
     // from CascadingAgentMBean
     //
+    @Override
     public int getCascadedMBeanCount() {
         return getCascadedMBeans().size();
     }
 
     // from CascadingAgentMBean
     //
+    @Override
     public abstract Set<ObjectInstance> getCascadedMBeans();
 
     /**
@@ -358,10 +366,12 @@ public abstract class CascadingAgent implements MBeanRegistration,
 
     // from CascadingAgentMBean
     //
+    @Override
     public abstract String getDescription();
 
     // from NotificationEmitter
     //
+    @Override
     public MBeanNotificationInfo[] getNotificationInfo() {
         final MBeanNotificationInfo[] info = { jmxConnectionNotificationInfo };
         return info;
@@ -369,12 +379,14 @@ public abstract class CascadingAgent implements MBeanRegistration,
 
     // from CascadingAgentMBean
     //
+    @Override
     public final ObjectName getPattern() {
         return sourcePattern;
     }
 
     // from CascadingAgentMBean
     //
+    @Override
     public final QueryExp getQuery() {
         return sourceQuery;
     }
@@ -389,27 +401,32 @@ public abstract class CascadingAgent implements MBeanRegistration,
 
     // from CascadingAgentMBean
     //
-    public final String getTargetPath() {
-        return targetPath;
+    @Override
+    public final String getNodeName() {
+        return nodeName;
     }
 
     // from CascadingAgentMBean
     //
+    @Override
     public abstract boolean isActive();
 
-    // from MBeanRegistration 
+    // from MBeanRegistration
     //
+    @Override
     public void postDeregister() {
         myMBS = null;
     }
 
-    // from MBeanRegistration 
+    // from MBeanRegistration
     //
+    @Override
     public void postRegister(Boolean registrationDone) {
     }
 
-    // from MBeanRegistration 
+    // from MBeanRegistration
     //
+    @Override
     public void preDeregister() throws java.lang.Exception {
     }
 
@@ -435,6 +452,7 @@ public abstract class CascadingAgent implements MBeanRegistration,
      *                <tt>MBeanServer</tt>.
      * @see MBeanRegistration#preRegister
      */
+    @Override
     public ObjectName preRegister(MBeanServer server, ObjectName name)
                                                                       throws java.lang.Exception {
         if (name == null) {
@@ -451,6 +469,7 @@ public abstract class CascadingAgent implements MBeanRegistration,
 
     // from NotificationEmitter
     //
+    @Override
     public void removeNotificationListener(NotificationListener listener)
                                                                          throws ListenerNotFoundException {
         emitter.removeNotificationListener(listener);
@@ -458,6 +477,7 @@ public abstract class CascadingAgent implements MBeanRegistration,
 
     // from NotificationEmitter
     //
+    @Override
     public void removeNotificationListener(NotificationListener listener,
                                            NotificationFilter filter,
                                            Object handback)
@@ -467,15 +487,18 @@ public abstract class CascadingAgent implements MBeanRegistration,
 
     // from CascadingAgentMBean
     //
+    @Override
     public abstract void start() throws IOException;
 
     // from CascadingAgentMBean
     //
+    @Override
     public abstract void start(boolean conflictAllowed) throws IOException,
                                                        InstanceAlreadyExistsException;
 
     // from CascadingAgentMBean
     //
+    @Override
     public abstract void stop() throws IOException;
 
     /**

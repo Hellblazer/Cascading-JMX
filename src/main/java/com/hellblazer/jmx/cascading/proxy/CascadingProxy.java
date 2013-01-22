@@ -99,6 +99,59 @@ public class CascadingProxy implements DynamicMBean, MBeanRegistration,
         NotificationEmitter {
 
     /**
+     * ListenerWrapper wraps a client NotificationListener - in order to
+     * translate ObjectNames in the received notification before forwarding it
+     * to the wrapped listener.
+     **/
+    public final class ListenerWrapper implements NotificationListener {
+        public final NotificationListener listener;
+        final NotificationFilter          filter;
+        final Object                      handback;
+
+        public ListenerWrapper(NotificationListener listener,
+                               NotificationFilter filter, Object handback) {
+            this.listener = listener;
+            this.filter = filter;
+            this.handback = handback;
+        }
+
+        @Override
+        public void handleNotification(Notification notif, Object handback) {
+
+            // Only change the source if it's the object name of the
+            // source object.
+            //
+            listener.handleNotification(translate(notif), handback);
+        }
+    }
+
+    /**
+     * The underlying <code>MBeanServerConnectionFactory</code>
+     **/
+    private final MBeanServerConnectionFactory connectionFactory;
+
+    /**
+     * Current list of listeners, a List of ListenerInfo. The object referenced
+     * by this field is never modified. Instead, the field is set to a new
+     * object when a listener is added or removed, within a synchronized(this).
+     * In this way, there is no need to synchronize when traversing the list to
+     * send a notification to the listeners in it. That avoids potential
+     * deadlocks if the listeners end up depending on other threads that are
+     * themselves accessing this <tt>NotificationBroadcasterSupport</tt>.
+     */
+    private List<ListenerWrapper>              listenerList;
+
+    /**
+     * The <tt>ObjectName</tt> of the source MBean.
+     **/
+    private final ObjectName                   source;
+
+    /**
+     * The <tt>ObjectName</tt> of the cascading proxy (this object's name).
+     **/
+    private ObjectName                         targetName;
+
+    /**
      * Creates a new <tt>CascadingProxy</tt>.
      * 
      * @param sourceMBeanName
@@ -122,90 +175,69 @@ public class CascadingProxy implements DynamicMBean, MBeanRegistration,
     }
 
     /**
-     * Called by the <tt>CascadingProxy</tt> when an <tt>IOException</tt>
-     * exception is caught while trying to talk with the source MBean.
-     * Subclasses who need a more specific handling of such exceptions (e.g.
-     * logging etc) can implement it by redefining this method. The returned
-     * <tt>RuntimeException</tt> will be thrown by the calling method.
+     * Adds a listener to the source MBean.
      * 
-     * @param x
-     *            The <tt>IOException</tt> exception.
-     * @param method
-     *            The name of the method in which the exception <var>x</var> was
-     *            caught.
-     * @return An {@link UndeclaredThrowableException} wrapping the undeclared
-     *         checked exception <var>x</var>.
-     **/
-    RuntimeException handleIOException(IOException x, String method) {
-        final RuntimeException r = new UndeclaredThrowableException(x);
-        return r;
-    }
+     * @param listener
+     *            The listener object which will handle the notifications
+     *            emitted by the broadcaster.
+     * @param filter
+     *            The filter object. If filter is null, no filtering will be
+     *            performed before handling notifications.
+     * @param handback
+     *            An opaque object to be sent back to the listener when a
+     *            notification is emitted. This object cannot be used by the
+     *            Notification broadcaster object. It should be resent unchanged
+     *            with the notification to the listener.
+     * 
+     * @exception IllegalArgumentException
+     *                Listener parameter is null.
+     * @exception UndeclaredThrowableException
+     *                if an <tt>InstanceNotFoundException</tt> or an
+     *                <tt>IOException</tt> is raised while trying to forward the
+     *                request to the source MBean.
+     * 
+     * @see #removeNotificationListener
+     * @see NotificationBroadcaster#addNotificationListener
+     */
+    @Override
+    public void addNotificationListener(NotificationListener listener,
+                                        NotificationFilter filter,
+                                        Object handback) {
 
-    /**
-     * Called by the <tt>CascadingProxy</tt> when an
-     * <tt>InstanceNotFoundException</tt> exception is caught while trying to
-     * talk with the source MBean. Subclasses who need a more specific handling
-     * of such exceptions (e.g. logging etc) can implement it by redefining this
-     * method. The returned <tt>RuntimeException</tt> will be thrown by the
-     * calling method.
-     * 
-     * @param x
-     *            The <tt>InstanceNotFoundException</tt> exception.
-     * @param method
-     *            The name of the method in which the exception <var>x</var> was
-     *            caught.
-     * @return An {@link UndeclaredThrowableException} wrapping the undeclared
-     *         checked exception <var>x</var>.
-     **/
-    RuntimeException handleInstanceNotFoundException(InstanceNotFoundException x,
-                                                     String method) {
-        final RuntimeException r = new UndeclaredThrowableException(x);
-        return r;
-    }
+        if (listener == null) {
+            throw new IllegalArgumentException("Listener can't be null");
+        }
 
-    /**
-     * Called by the <tt>CascadingProxy</tt> when an undeclared checked
-     * exception is caught while trying to talk with the source MBean. This
-     * method is not called for either <tt>IOException</tt> (see
-     * {@link #handleIOException handleIOException(x,method)}) or
-     * <tt>InstanceNotFoundException</tt> (see
-     * {@link #handleInstanceNotFoundException
-     * handleInstanceNotFoundException(x,method)}). Subclasses who need a more
-     * specific handling of such exceptions (e.g. logging etc) can implement it
-     * by redefining this method. The returned <tt>RuntimeException</tt> will be
-     * thrown by the calling method.
-     * 
-     * @param x
-     *            The undeclared checked exception.
-     * @param method
-     *            The name of the method in which the exception <var>x</var> was
-     *            caught.
-     * @return An {@link UndeclaredThrowableException} wrapping the undeclared
-     *         checked exception <var>x</var>.
-     **/
-    RuntimeException handleCheckedException(Exception x, String method) {
-        final RuntimeException r = new UndeclaredThrowableException(x);
-        return r;
-    }
-
-    /**
-     * Returns an <tt>MBeanServerConnection</tt> obtained from the underlying
-     * {@link MBeanServerConnectionFactory}. This method is called every time
-     * the cascading proxy needs to forward an operation to the source MBean.
-     * Subclasses should not implement connection caching by redefining this
-     * method. Connection caching, if needed, should be delegated to the
-     * underlying {@link MBeanServerConnectionFactory}.
-     * 
-     * @exception IOException
-     *                if no <tt>MBeanServerConnection</tt> can be obtained.
-     * @return An <tt>MBeanServerConnection</tt> to the <tt>MBeanServer</tt> in
-     *         which the source MBean resides.
-     **/
-    private MBeanServerConnection connection() throws IOException {
-        final MBeanServerConnection c = connectionFactory.getMBeanServerConnection();
-        if (c == null)
-            throw new IOException("MBeanServerConnection unavailable");
-        return c;
+        /*
+         * Adding a new listener takes O(n) time where n is the number of
+         * existing listeners. If you have a very large number of listeners
+         * performance could degrade. That's a fairly surprising configuration,
+         * and it is hard to avoid this behavior while still retaining the
+         * property that the listenerList is not synchronized while
+         * notifications are being sent through it. If this becomes a problem, a
+         * possible solution would be a multiple-readers single-writer setup, so
+         * any number of sendNotification() calls could run concurrently but
+         * they would exclude an add/removeNotificationListener. A simpler but
+         * less efficient solution would be to clone the listener list every
+         * time a notification is sent.
+         */
+        synchronized (this) {
+            ListenerWrapper w = new ListenerWrapper(listener, filter, handback);
+            try {
+                connection().addNotificationListener(source, w, filter,
+                                                     handback);
+                List<ListenerWrapper> newList = new ArrayList<ListenerWrapper>(
+                                                                               listenerList.size() + 1);
+                newList.addAll(listenerList);
+                newList.add(w);
+                listenerList = newList;
+            } catch (IOException x) {
+                throw handleIOException(x, "addNotificationListener");
+            } catch (InstanceNotFoundException x) {
+                throw handleInstanceNotFoundException(x,
+                                                      "addNotificationListener");
+            }
+        }
     }
 
     /**
@@ -231,6 +263,7 @@ public class CascadingProxy implements DynamicMBean, MBeanRegistration,
      * @see #setAttribute
      * @see DynamicMBean#getAttribute
      */
+    @Override
     public Object getAttribute(String attribute)
                                                 throws AttributeNotFoundException,
                                                 MBeanException,
@@ -241,43 +274,6 @@ public class CascadingProxy implements DynamicMBean, MBeanRegistration,
             throw handleIOException(x, "getAttribute");
         } catch (InstanceNotFoundException x) {
             throw handleInstanceNotFoundException(x, "getAttribute");
-        }
-    }
-
-    /**
-     * Set the value of a specific attribute on the source MBean.
-     * 
-     * @param attribute
-     *            The identification of the attribute to be set and the value it
-     *            is to be set to.
-     * 
-     * @exception AttributeNotFoundException
-     * @exception InvalidAttributeValueException
-     * @exception MBeanException
-     *                Wraps a <tt>java.lang.Exception</tt> thrown by the MBean's
-     *                setter.
-     * @exception ReflectionException
-     *                Wraps a <tt>java.lang.Exception</tt> thrown while trying
-     *                to invoke the MBean's setter.
-     * @exception UndeclaredThrowableException
-     *                if an <tt>InstanceNotFoundException</tt> or an
-     *                <tt>IOException</tt> is raised while trying to forward the
-     *                request to the source MBean.
-     * 
-     * @see #getAttribute
-     * @see DynamicMBean#setAttribute
-     */
-    public void setAttribute(Attribute attribute)
-                                                 throws AttributeNotFoundException,
-                                                 InvalidAttributeValueException,
-                                                 MBeanException,
-                                                 ReflectionException {
-        try {
-            connection().setAttribute(source, attribute);
-        } catch (IOException x) {
-            throw handleIOException(x, "setAttribute");
-        } catch (InstanceNotFoundException x) {
-            throw handleInstanceNotFoundException(x, "setAttribute");
         }
     }
 
@@ -298,6 +294,7 @@ public class CascadingProxy implements DynamicMBean, MBeanRegistration,
      * @see #setAttributes
      * @see DynamicMBean#getAttributes
      */
+    @Override
     public AttributeList getAttributes(String[] attributes) {
         try {
             return connection().getAttributes(source, attributes);
@@ -313,35 +310,96 @@ public class CascadingProxy implements DynamicMBean, MBeanRegistration,
     }
 
     /**
-     * Sets the values of several attributes in the source MBean.
+     * Returns the <tt>MBeanServerConnectionFactory</tt>, as passed to this
+     * object's constructor.
+     **/
+    public final MBeanServerConnectionFactory getConnectionFactory() {
+        return connectionFactory;
+    }
+
+    /**
+     * Returns the <tt>MBeanInfo</tt> of the source MBean. This
+     * <tt>MBeanInfo</tt> is not cached by the proxy, which could be considered
+     * as a suboptimal implementation for those implementations in which it is
+     * known that the source <tt>MBeanInfo</tt> will not change over time.
+     * <p>
+     * Subclasses may therefore wish to redefine this method in order to cache
+     * the returned <tt>MBeanInfo</tt>.
      * 
-     * @param attributes
-     *            A list of attributes: The identification of the attributes to
-     *            be set and the values they are to be set to.
-     * 
-     * @return The list of attributes that were set, with their new values.
-     * 
+     * @return The source MBean <tt>MBeanInfo</tt>.
      * @exception UndeclaredThrowableException
      *                if an <tt>InstanceNotFoundException</tt>, an
-     *                <tt>IOException</tt>, or a <tt>ReflectionException</tt> is
-     *                raised while trying to forward the request to the source
-     *                MBean.
-     * 
-     * @see #getAttributes
-     * @see DynamicMBean#setAttributes
-     */
-    public AttributeList setAttributes(AttributeList attributes) {
+     *                <tt>IOException</tt>, a <tt>ReflectionException</tt>, or
+     *                an <tt>IntrospectionException</tt> is raised while trying
+     *                to forward the request to the source MBean.
+     **/
+    @Override
+    public MBeanInfo getMBeanInfo() {
         try {
-            return connection().setAttributes(source, attributes);
+            return connection().getMBeanInfo(source);
         } catch (IOException x) {
-            throw handleIOException(x, "setAttributes");
+            throw handleIOException(x, "getMBeanInfo");
         } catch (InstanceNotFoundException x) {
-            throw handleInstanceNotFoundException(x, "setAttributes");
+            throw handleInstanceNotFoundException(x, "getMBeanInfo");
         } catch (RuntimeException r) {
             throw r;
         } catch (Exception x) {
-            throw handleCheckedException(x, "setAttributes");
+            throw handleCheckedException(x, "getMBeanInfo");
         }
+    }
+
+    /**
+     * <p>
+     * Returns an array indicating, for each notification this MBean may send,
+     * the name of the Java class of the notification and the notification type.
+     * </p>
+     * 
+     * <p>
+     * This method returns the notification information present in the source
+     * MBean's <tt>MBeanInfo</tt> - if any. Otherwise, it returns an empty
+     * array.
+     * </p>
+     * 
+     * <p>
+     * It is not illegal for the MBean to send notifications not described in
+     * this array. However, some clients of the MBean server may depend on the
+     * array being complete for their correct functioning.
+     * </p>
+     * 
+     * @return the array of possible notifications.
+     * @see NotificationBroadcaster#getNotificationInfo
+     */
+    @Override
+    public MBeanNotificationInfo[] getNotificationInfo() {
+        try {
+            final MBeanNotificationInfo[] info = getMBeanInfo().getNotifications();
+            if (info == null) {
+                return new MBeanNotificationInfo[0];
+            } else {
+                return info;
+            }
+        } catch (Exception x) {
+            // OK.
+        }
+        return new MBeanNotificationInfo[0];
+    }
+
+    /**
+     * The <tt>ObjectName</tt> of the source MBean, as passed to this Object's
+     * constructor.
+     **/
+    public final ObjectName getSourceMBeanName() {
+        return source;
+    }
+
+    /**
+     * The <tt>ObjectName</tt> of this cascading proxy. May be null if this
+     * object has not been registered in an <tt>MBeanServer</tt> yet. Otherwise,
+     * it is the <tt>ObjectName</tt> obtained from the {@link #preRegister}
+     * method.
+     **/
+    public synchronized ObjectName getTargetName() {
+        return targetName;
     }
 
     /**
@@ -371,6 +429,7 @@ public class CascadingProxy implements DynamicMBean, MBeanRegistration,
      * 
      * @see DynamicMBean#invoke
      */
+    @Override
     public Object invoke(String actionName, Object params[], String signature[])
                                                                                 throws MBeanException,
                                                                                 ReflectionException {
@@ -384,34 +443,49 @@ public class CascadingProxy implements DynamicMBean, MBeanRegistration,
     }
 
     /**
-     * Returns the <tt>MBeanInfo</tt> of the source MBean. This
-     * <tt>MBeanInfo</tt> is not cached by the proxy, which could be considered
-     * as a suboptimal implementation for those implementations in which it is
-     * known that the source <tt>MBeanInfo</tt> will not change over time.
-     * <p>
-     * Subclasses may therefore wish to redefine this method in order to cache
-     * the returned <tt>MBeanInfo</tt>.
-     * 
-     * @return The source MBean <tt>MBeanInfo</tt>.
-     * @exception UndeclaredThrowableException
-     *                if an <tt>InstanceNotFoundException</tt>, an
-     *                <tt>IOException</tt>, a <tt>ReflectionException</tt>, or
-     *                an <tt>IntrospectionException</tt> is raised while trying
-     *                to forward the request to the source MBean.
-     **/
-    public MBeanInfo getMBeanInfo() {
-        try {
-            return connection().getMBeanInfo(source);
-        } catch (IOException x) {
-            throw handleIOException(x, "getMBeanInfo");
-        } catch (InstanceNotFoundException x) {
-            throw handleInstanceNotFoundException(x, "getMBeanInfo");
-        } catch (RuntimeException r) {
-            throw r;
-        } catch (Exception x) {
-            throw handleCheckedException(x, "getMBeanInfo");
-        }
+     * Allows the MBean to perform any operations needed after having been
+     * unregistered in the MBean server. This default implementation does
+     * nothing.
+     */
+    @Override
+    public void postDeregister() {
     }
+
+    /**
+     * Allows the MBean to perform any operations needed after having been
+     * registered in the MBean server or after the registration has failed. This
+     * default implementation does nothing.
+     * 
+     * @param registrationDone
+     *            Indicates whether or not the MBean has been successfully
+     *            registered in the MBean server. The value false means that the
+     *            registration phase has failed.
+     * @see MBeanRegistration#postRegister
+     */
+    @Override
+    public void postRegister(Boolean registrationDone) {
+    }
+
+    /**
+     * Allows the MBean to perform any operations it needs before being
+     * unregistered by the MBean server. This default implementation does
+     * nothing.
+     * 
+     * @exception java.lang.Exception
+     *                This exception will be caught by the MBean server and
+     *                re-thrown as an {@link MBeanRegistrationException} or a
+     *                {@link RuntimeMBeanException}.
+     * @see MBeanRegistration#preDeregister
+     */
+    @Override
+    public void preDeregister() throws java.lang.Exception {
+    }
+
+    /*
+     * The following is a "close clone" of NotificationBroadcasterSupport, that
+     * handles an internal list of ListenerWrapper. The sole purpose of the
+     * listener wrapper is to modify the source of the emitted notification.
+     */
 
     /**
      * Allows the MBean to perform any operations it needs before being
@@ -434,175 +508,17 @@ public class CascadingProxy implements DynamicMBean, MBeanRegistration,
      *                if the parameter <var>name</var> is <tt>null</tt>
      * @see MBeanRegistration#preRegister
      */
+    @Override
     public ObjectName preRegister(MBeanServer server, ObjectName name)
                                                                       throws java.lang.Exception {
-        if (name == null)
+        if (name == null) {
             throw new IllegalArgumentException("Illegal ObjectName: null");
+        }
 
         synchronized (this) {
             targetName = name;
         }
         return targetName;
-    }
-
-    /**
-     * Allows the MBean to perform any operations needed after having been
-     * registered in the MBean server or after the registration has failed. This
-     * default implementation does nothing.
-     * 
-     * @param registrationDone
-     *            Indicates whether or not the MBean has been successfully
-     *            registered in the MBean server. The value false means that the
-     *            registration phase has failed.
-     * @see MBeanRegistration#postRegister
-     */
-    public void postRegister(Boolean registrationDone) {
-    }
-
-    /**
-     * Allows the MBean to perform any operations it needs before being
-     * unregistered by the MBean server. This default implementation does
-     * nothing.
-     * 
-     * @exception java.lang.Exception
-     *                This exception will be caught by the MBean server and
-     *                re-thrown as an {@link MBeanRegistrationException} or a
-     *                {@link RuntimeMBeanException}.
-     * @see MBeanRegistration#preDeregister
-     */
-    public void preDeregister() throws java.lang.Exception {
-    }
-
-    /**
-     * Allows the MBean to perform any operations needed after having been
-     * unregistered in the MBean server. This default implementation does
-     * nothing.
-     */
-    public void postDeregister() {
-    }
-
-    /**
-     * The <tt>ObjectName</tt> of the source MBean, as passed to this Object's
-     * constructor.
-     **/
-    public final ObjectName getSourceMBeanName() {
-        return source;
-    }
-
-    /**
-     * The <tt>ObjectName</tt> of this cascading proxy. May be null if this
-     * object has not been registered in an <tt>MBeanServer</tt> yet. Otherwise,
-     * it is the <tt>ObjectName</tt> obtained from the {@link #preRegister}
-     * method.
-     **/
-    public synchronized ObjectName getTargetName() {
-        return targetName;
-    }
-
-    /**
-     * <p>
-     * Returns an array indicating, for each notification this MBean may send,
-     * the name of the Java class of the notification and the notification type.
-     * </p>
-     * 
-     * <p>
-     * This method returns the notification information present in the source
-     * MBean's <tt>MBeanInfo</tt> - if any. Otherwise, it returns an empty
-     * array.
-     * </p>
-     * 
-     * <p>
-     * It is not illegal for the MBean to send notifications not described in
-     * this array. However, some clients of the MBean server may depend on the
-     * array being complete for their correct functioning.
-     * </p>
-     * 
-     * @return the array of possible notifications.
-     * @see NotificationBroadcaster#getNotificationInfo
-     */
-    public MBeanNotificationInfo[] getNotificationInfo() {
-        try {
-            final MBeanNotificationInfo[] info = getMBeanInfo().getNotifications();
-            if (info == null)
-                return new MBeanNotificationInfo[0];
-            else
-                return info;
-        } catch (Exception x) {
-            // OK.
-        }
-        return new MBeanNotificationInfo[0];
-    }
-
-    /*
-     * The following is a "close clone" of NotificationBroadcasterSupport,
-     * that handles an internal list of ListenerWrapper.
-     * The sole purpose of the listener wrapper is to modify the
-     * source of the emitted notification.
-     */
-
-    /**
-     * Adds a listener to the source MBean.
-     * 
-     * @param listener
-     *            The listener object which will handle the notifications
-     *            emitted by the broadcaster.
-     * @param filter
-     *            The filter object. If filter is null, no filtering will be
-     *            performed before handling notifications.
-     * @param handback
-     *            An opaque object to be sent back to the listener when a
-     *            notification is emitted. This object cannot be used by the
-     *            Notification broadcaster object. It should be resent unchanged
-     *            with the notification to the listener.
-     * 
-     * @exception IllegalArgumentException
-     *                Listener parameter is null.
-     * @exception UndeclaredThrowableException
-     *                if an <tt>InstanceNotFoundException</tt> or an
-     *                <tt>IOException</tt> is raised while trying to forward the
-     *                request to the source MBean.
-     * 
-     * @see #removeNotificationListener
-     * @see NotificationBroadcaster#addNotificationListener
-     */
-    public void addNotificationListener(NotificationListener listener,
-                                        NotificationFilter filter,
-                                        Object handback) {
-
-        if (listener == null) {
-            throw new IllegalArgumentException("Listener can't be null");
-        }
-
-        /* Adding a new listener takes O(n) time where n is the number
-           of existing listeners.  If you have a very large number of
-           listeners performance could degrade.  That's a fairly
-           surprising configuration, and it is hard to avoid this
-           behavior while still retaining the property that the
-           listenerList is not synchronized while notifications are
-           being sent through it.  If this becomes a problem, a
-           possible solution would be a multiple-readers single-writer
-           setup, so any number of sendNotification() calls could run
-           concurrently but they would exclude an
-           add/removeNotificationListener.  A simpler but less
-           efficient solution would be to clone the listener list
-           every time a notification is sent.  */
-        synchronized (this) {
-            ListenerWrapper w = new ListenerWrapper(listener, filter, handback);
-            try {
-                connection().addNotificationListener(source, w, filter,
-                                                     handback);
-                List<ListenerWrapper> newList = new ArrayList<ListenerWrapper>(
-                                                                               listenerList.size() + 1);
-                newList.addAll(listenerList);
-                newList.add(w);
-                listenerList = newList;
-            } catch (IOException x) {
-                throw handleIOException(x, "addNotificationListener");
-            } catch (InstanceNotFoundException x) {
-                throw handleInstanceNotFoundException(x,
-                                                      "addNotificationListener");
-            }
-        }
     }
 
     /**
@@ -623,17 +539,20 @@ public class CascadingProxy implements DynamicMBean, MBeanRegistration,
      * @see #addNotificationListener
      * @see NotificationEmitter#removeNotificationListener
      */
+    @Override
     public void removeNotificationListener(NotificationListener listener)
                                                                          throws ListenerNotFoundException {
 
         synchronized (this) {
             List<ListenerWrapper> newList = new ArrayList<ListenerWrapper>(
                                                                            listenerList);
-            /* We scan the list of listeners in reverse order because
-               in forward order we would have to repeat the loop with
-               the same index after a remove.  */
+            /*
+             * We scan the list of listeners in reverse order because in forward
+             * order we would have to repeat the loop with the same index after
+             * a remove.
+             */
             for (int i = newList.size() - 1; i >= 0; i--) {
-                ListenerWrapper li = (ListenerWrapper) newList.get(i);
+                ListenerWrapper li = newList.get(i);
 
                 if (li.listener == listener) {
                     try {
@@ -647,8 +566,9 @@ public class CascadingProxy implements DynamicMBean, MBeanRegistration,
                     }
                 }
             }
-            if (newList.size() == listenerList.size())
+            if (newList.size() == listenerList.size()) {
                 throw new ListenerNotFoundException("Listener not registered");
+            }
             listenerList = newList;
         }
     }
@@ -683,6 +603,7 @@ public class CascadingProxy implements DynamicMBean, MBeanRegistration,
      * 
      * @see NotificationEmitter#removeNotificationListener
      */
+    @Override
     public void removeNotificationListener(NotificationListener listener,
                                            NotificationFilter filter,
                                            Object handback)
@@ -691,10 +612,11 @@ public class CascadingProxy implements DynamicMBean, MBeanRegistration,
         boolean found = false;
 
         synchronized (this) {
-            List<ListenerWrapper> newList = new ArrayList<ListenerWrapper>(listenerList);
+            List<ListenerWrapper> newList = new ArrayList<ListenerWrapper>(
+                                                                           listenerList);
             final int size = newList.size();
             for (int i = 0; i < size; i++) {
-                ListenerWrapper li = (ListenerWrapper) newList.get(i);
+                ListenerWrapper li = newList.get(i);
 
                 if (li.listener == listener) {
                     found = true;
@@ -720,9 +642,11 @@ public class CascadingProxy implements DynamicMBean, MBeanRegistration,
         }
 
         if (found) {
-            /* We found this listener, but not with the given filter
-             * and handback.  A more informative exception message may
-             * make debugging easier.  */
+            /*
+             * We found this listener, but not with the given filter and
+             * handback. A more informative exception message may make debugging
+             * easier.
+             */
             throw new ListenerNotFoundException("Listener not registered "
                                                 + "with this filter and "
                                                 + "handback");
@@ -732,37 +656,106 @@ public class CascadingProxy implements DynamicMBean, MBeanRegistration,
     }
 
     /**
-     * Returns the <tt>MBeanServerConnectionFactory</tt>, as passed to this
-     * object's constructor.
-     **/
-    public final MBeanServerConnectionFactory getConnectionFactory() {
-        return connectionFactory;
+     * Set the value of a specific attribute on the source MBean.
+     * 
+     * @param attribute
+     *            The identification of the attribute to be set and the value it
+     *            is to be set to.
+     * 
+     * @exception AttributeNotFoundException
+     * @exception InvalidAttributeValueException
+     * @exception MBeanException
+     *                Wraps a <tt>java.lang.Exception</tt> thrown by the MBean's
+     *                setter.
+     * @exception ReflectionException
+     *                Wraps a <tt>java.lang.Exception</tt> thrown while trying
+     *                to invoke the MBean's setter.
+     * @exception UndeclaredThrowableException
+     *                if an <tt>InstanceNotFoundException</tt> or an
+     *                <tt>IOException</tt> is raised while trying to forward the
+     *                request to the source MBean.
+     * 
+     * @see #getAttribute
+     * @see DynamicMBean#setAttribute
+     */
+    @Override
+    public void setAttribute(Attribute attribute)
+                                                 throws AttributeNotFoundException,
+                                                 InvalidAttributeValueException,
+                                                 MBeanException,
+                                                 ReflectionException {
+        try {
+            connection().setAttribute(source, attribute);
+        } catch (IOException x) {
+            throw handleIOException(x, "setAttribute");
+        } catch (InstanceNotFoundException x) {
+            throw handleInstanceNotFoundException(x, "setAttribute");
+        }
     }
 
     /**
-     * ListenerWrapper wraps a client NotificationListener - in order to
-     * translate ObjectNames in the received notification before forwarding it
-     * to the wrapped listener.
+     * Sets the values of several attributes in the source MBean.
+     * 
+     * @param attributes
+     *            A list of attributes: The identification of the attributes to
+     *            be set and the values they are to be set to.
+     * 
+     * @return The list of attributes that were set, with their new values.
+     * 
+     * @exception UndeclaredThrowableException
+     *                if an <tt>InstanceNotFoundException</tt>, an
+     *                <tt>IOException</tt>, or a <tt>ReflectionException</tt> is
+     *                raised while trying to forward the request to the source
+     *                MBean.
+     * 
+     * @see #getAttributes
+     * @see DynamicMBean#setAttributes
+     */
+    @Override
+    public AttributeList setAttributes(AttributeList attributes) {
+        try {
+            return connection().setAttributes(source, attributes);
+        } catch (IOException x) {
+            throw handleIOException(x, "setAttributes");
+        } catch (InstanceNotFoundException x) {
+            throw handleInstanceNotFoundException(x, "setAttributes");
+        } catch (RuntimeException r) {
+            throw r;
+        } catch (Exception x) {
+            throw handleCheckedException(x, "setAttributes");
+        }
+    }
+
+    /**
+     * Returns an <tt>MBeanServerConnection</tt> obtained from the underlying
+     * {@link MBeanServerConnectionFactory}. This method is called every time
+     * the cascading proxy needs to forward an operation to the source MBean.
+     * Subclasses should not implement connection caching by redefining this
+     * method. Connection caching, if needed, should be delegated to the
+     * underlying {@link MBeanServerConnectionFactory}.
+     * 
+     * @exception IOException
+     *                if no <tt>MBeanServerConnection</tt> can be obtained.
+     * @return An <tt>MBeanServerConnection</tt> to the <tt>MBeanServer</tt> in
+     *         which the source MBean resides.
      **/
-    public final class ListenerWrapper implements NotificationListener {
-        public final NotificationListener listener;
-        final NotificationFilter          filter;
-        final Object                      handback;
-
-        public ListenerWrapper(NotificationListener listener,
-                               NotificationFilter filter, Object handback) {
-            this.listener = listener;
-            this.filter = filter;
-            this.handback = handback;
+    private MBeanServerConnection connection() throws IOException {
+        final MBeanServerConnection c = connectionFactory.getMBeanServerConnection();
+        if (c == null) {
+            throw new IOException("MBeanServerConnection unavailable");
         }
+        return c;
+    }
 
-        public void handleNotification(Notification notif, Object handback) {
-
-            // Only change the source if it's the object name of the
-            // source object.
-            //
-            listener.handleNotification(translate(notif), handback);
+    private Object makeSource(Object source) {
+        if (source != null && !source.equals(getSourceMBeanName())) {
+            return source;
         }
+        final ObjectName name = getTargetName();
+        if (name == null) {
+            return CascadingProxy.this;
+        }
+        return name;
     }
 
     /**
@@ -779,38 +772,70 @@ public class CascadingProxy implements DynamicMBean, MBeanRegistration,
         return notif;
     }
 
-    private Object makeSource(Object source) {
-        if (source != null && !source.equals(getSourceMBeanName()))
-            return source;
-        final ObjectName name = getTargetName();
-        if (name == null)
-            return CascadingProxy.this;
-        return name;
+    /**
+     * Called by the <tt>CascadingProxy</tt> when an undeclared checked
+     * exception is caught while trying to talk with the source MBean. This
+     * method is not called for either <tt>IOException</tt> (see
+     * {@link #handleIOException handleIOException(x,method)}) or
+     * <tt>InstanceNotFoundException</tt> (see
+     * {@link #handleInstanceNotFoundException
+     * handleInstanceNotFoundException(x,method)}). Subclasses who need a more
+     * specific handling of such exceptions (e.g. logging etc) can implement it
+     * by redefining this method. The returned <tt>RuntimeException</tt> will be
+     * thrown by the calling method.
+     * 
+     * @param x
+     *            The undeclared checked exception.
+     * @param method
+     *            The name of the method in which the exception <var>x</var> was
+     *            caught.
+     * @return An {@link UndeclaredThrowableException} wrapping the undeclared
+     *         checked exception <var>x</var>.
+     **/
+    RuntimeException handleCheckedException(Exception x, String method) {
+        final RuntimeException r = new UndeclaredThrowableException(x);
+        return r;
     }
 
     /**
-     * Current list of listeners, a List of ListenerInfo. The object referenced
-     * by this field is never modified. Instead, the field is set to a new
-     * object when a listener is added or removed, within a synchronized(this).
-     * In this way, there is no need to synchronize when traversing the list to
-     * send a notification to the listeners in it. That avoids potential
-     * deadlocks if the listeners end up depending on other threads that are
-     * themselves accessing this <tt>NotificationBroadcasterSupport</tt>.
-     */
-    private List<ListenerWrapper>              listenerList;
+     * Called by the <tt>CascadingProxy</tt> when an
+     * <tt>InstanceNotFoundException</tt> exception is caught while trying to
+     * talk with the source MBean. Subclasses who need a more specific handling
+     * of such exceptions (e.g. logging etc) can implement it by redefining this
+     * method. The returned <tt>RuntimeException</tt> will be thrown by the
+     * calling method.
+     * 
+     * @param x
+     *            The <tt>InstanceNotFoundException</tt> exception.
+     * @param method
+     *            The name of the method in which the exception <var>x</var> was
+     *            caught.
+     * @return An {@link UndeclaredThrowableException} wrapping the undeclared
+     *         checked exception <var>x</var>.
+     **/
+    RuntimeException handleInstanceNotFoundException(InstanceNotFoundException x,
+                                                     String method) {
+        final RuntimeException r = new UndeclaredThrowableException(x);
+        return r;
+    }
 
     /**
-     * The underlying <code>MBeanServerConnectionFactory</code>
+     * Called by the <tt>CascadingProxy</tt> when an <tt>IOException</tt>
+     * exception is caught while trying to talk with the source MBean.
+     * Subclasses who need a more specific handling of such exceptions (e.g.
+     * logging etc) can implement it by redefining this method. The returned
+     * <tt>RuntimeException</tt> will be thrown by the calling method.
+     * 
+     * @param x
+     *            The <tt>IOException</tt> exception.
+     * @param method
+     *            The name of the method in which the exception <var>x</var> was
+     *            caught.
+     * @return An {@link UndeclaredThrowableException} wrapping the undeclared
+     *         checked exception <var>x</var>.
      **/
-    private final MBeanServerConnectionFactory connectionFactory;
-
-    /**
-     * The <tt>ObjectName</tt> of the source MBean.
-     **/
-    private final ObjectName                   source;
-
-    /**
-     * The <tt>ObjectName</tt> of the cascading proxy (this object's name).
-     **/
-    private ObjectName                         targetName;
+    RuntimeException handleIOException(IOException x, String method) {
+        final RuntimeException r = new UndeclaredThrowableException(x);
+        return r;
+    }
 }

@@ -136,30 +136,28 @@ import com.hellblazer.jmx.cascading.proxy.ProxyCascadingAgent;
  * @since Java DMK 5.1
  **/
 // Note: To make this class extensible it is possible to change the
-//       protection of createCascadingAgent, connectSource, and 
-//       terminate from "package" to "protected"
+// protection of createCascadingAgent, connectSource, and
+// terminate from "package" to "protected"
 //
 public class CascadingService implements CascadingServiceMBean,
         NotificationEmitter, MBeanRegistration {
-    private final Logger log = LoggerFactory.getLogger(CascadingService.class);
-
     class MountPoint {
 
         public final String                  mountPointID;
         public final ObjectName              sourcePattern;
         public final JMXServiceURL           sourceURL;
-        public final String                  targetPath;
+        public final String                  nodeName;
 
         private CascadingAgent               agent                   = null;
         private MBeanServerConnectionFactory sourceConnectionFactory = null;
         private JMXConnector                 sourceConnector         = null;
 
         public MountPoint(JMXServiceURL sourceURL, ObjectName sourcePattern,
-                          String targetPath) throws IOException {
-            mountPointID = makeID(sourceURL, sourcePattern, targetPath);
+                          String nodeName) throws IOException {
+            mountPointID = makeID(sourceURL, sourcePattern, nodeName);
             this.sourceURL = sourceURL;
             this.sourcePattern = sourcePattern;
-            this.targetPath = targetPath;
+            this.nodeName = nodeName;
         }
 
         // Must be called from a synchronized block on the containing
@@ -206,7 +204,7 @@ public class CascadingService implements CascadingServiceMBean,
                                                                               InstanceAlreadyExistsException {
             this.sourceConnector = sourceConnector;
             agent = createCascadingAgent(sourceConnector, sourcePattern,
-                                         targetPath, targetMBS, mountPointID);
+                                         nodeName, targetMBS, mountPointID);
             sourceConnectionFactory = agent.getConnectionFactory();
             agent.start(false);
             sourceConnectionFactory.addConnectionNotificationListener(listener,
@@ -272,6 +270,8 @@ public class CascadingService implements CascadingServiceMBean,
 
     private final NotificationListener           listener;
 
+    private final Logger                         log            = LoggerFactory.getLogger(CascadingService.class);
+
     private final HashMap<String, MountPoint>    mountMap;
 
     private MBeanServer                          myMBS          = null;
@@ -301,6 +301,7 @@ public class CascadingService implements CascadingServiceMBean,
     public CascadingService(MBeanServer targetMBS) {
         this.targetMBS = targetMBS;
         listener = new NotificationListener() {
+            @Override
             public void handleNotification(Notification nt, Object handback) {
                 handleJMXCN(nt, handback);
             };
@@ -311,6 +312,7 @@ public class CascadingService implements CascadingServiceMBean,
 
     // from NotificationEmitter
     //
+    @Override
     public final void addNotificationListener(NotificationListener listener,
                                               NotificationFilter filter,
                                               Object handback)
@@ -320,12 +322,14 @@ public class CascadingService implements CascadingServiceMBean,
 
     // from CascadingServiceMBean
     //
+    @Override
     public synchronized String[] getMountPointIDs() {
         return mountMap.keySet().toArray(new String[mountMap.size()]);
     }
 
     // from NotificationEmitter
     //
+    @Override
     public MBeanNotificationInfo[] getNotificationInfo() {
         final MBeanNotificationInfo[] info = { jmxConnectionNotificationInfo };
         return info;
@@ -343,6 +347,7 @@ public class CascadingService implements CascadingServiceMBean,
 
     // from CascadingServiceMBean
     //
+    @Override
     public synchronized boolean isMounted(String mountPointID) {
         return mountMap.containsKey(mountPointID);
     }
@@ -352,15 +357,16 @@ public class CascadingService implements CascadingServiceMBean,
 
     // from CascadingServiceMBean
     //
+    @Override
     public final synchronized String mount(JMXServiceURL sourceURL,
                                            Map<String, ?> sourceMap,
                                            ObjectName sourcePattern,
-                                           String targetPath)
+                                           String nameNode)
                                                              throws IOException,
                                                              InstanceAlreadyExistsException {
 
         final MountPoint mpt = new MountPoint(sourceURL, sourcePattern,
-                                              targetPath);
+                                              nameNode);
 
         if (isMounted(mpt.mountPointID)) {
             throw new IOException(mpt.mountPointID + ": already mounted.");
@@ -379,7 +385,7 @@ public class CascadingService implements CascadingServiceMBean,
             if (log.isDebugEnabled()) {
                 log.debug(String.format("Exception mounting %s, %s, %s, %s, %s",
                                         sourceURL, sourceMap, sourcePattern,
-                                        targetPath, mpt), x);
+                                        nameNode, mpt), x);
             }
             try {
 
@@ -411,19 +417,39 @@ public class CascadingService implements CascadingServiceMBean,
         }
     }
 
+    /*
+     * (non-Javadoc)
+     * 
+     * @see
+     * com.hellblazer.jmx.cascading.CascadingServiceMBean#mount(java.lang.String
+     * , javax.management.ObjectName, java.lang.String)
+     */
+    @Override
+    public String mount(String sourceURL, String sourcePattern,
+                        String nameNode) throws IOException,
+                                          InstanceAlreadyExistsException,
+                                          MalformedObjectNameException {
+        JMXServiceURL url = new JMXServiceURL(sourceURL);
+        ObjectName name = new ObjectName(sourcePattern);
+        return mount(url, null, name, nameNode);
+    }
+
     // from MBeanRegistration
     //
+    @Override
     public void postDeregister() {
         myMBS = null;
     }
 
     // from MBeanRegistration
     //
+    @Override
     public void postRegister(Boolean registrationDone) {
     }
 
     // from MBeanRegistration
     //
+    @Override
     public void preDeregister() throws java.lang.Exception {
     }
 
@@ -453,6 +479,7 @@ public class CascadingService implements CascadingServiceMBean,
      * 
      * @see MBeanRegistration#preRegister
      */
+    @Override
     public ObjectName preRegister(MBeanServer server, ObjectName name)
                                                                       throws java.lang.Exception {
         synchronized (this) {
@@ -470,6 +497,7 @@ public class CascadingService implements CascadingServiceMBean,
 
     // from NotificationEmitter
     //
+    @Override
     public final void removeNotificationListener(NotificationListener listener)
                                                                                throws ListenerNotFoundException {
         emitter.removeNotificationListener(listener);
@@ -477,6 +505,7 @@ public class CascadingService implements CascadingServiceMBean,
 
     // from NotificationEmitter
     //
+    @Override
     public final void removeNotificationListener(NotificationListener listener,
                                                  NotificationFilter filter,
                                                  Object handback)
@@ -486,6 +515,7 @@ public class CascadingService implements CascadingServiceMBean,
 
     // from CascadingServiceMBean
     //
+    @Override
     public final boolean unmount(String mountPointID) throws IOException {
         MountPoint mpt = null;
         Exception failure = null;
@@ -553,7 +583,7 @@ public class CascadingService implements CascadingServiceMBean,
         }
 
         if (closed) {
-            //  send notification
+            // send notification
             final String type = CASCADING_FAILED_NOTIFICATION;
             final String cause = JMXConnectionNotification.FAILED.equals(nt.getType()) ? "failed"
                                                                                       : "closed";
@@ -600,7 +630,7 @@ public class CascadingService implements CascadingServiceMBean,
      *                {@link JMXConnectorFactory#connect
      *                JMXConnectorFactory.connect}.
      **/
-    // protected 
+    // protected
     JMXConnector connectSource(JMXServiceURL sourceURL,
                                Map<String, ?> sourceMap, String mountPointID)
                                                                              throws IOException {
@@ -629,10 +659,11 @@ public class CascadingService implements CascadingServiceMBean,
      *            <var>sourcePattern</var> that was passed to {@link #mount
      *            mount}.
      *            <p>
-     * @param targetPath
-     *            The <i>domain path</i> under which the source MBeans will be
-     *            mounted in the target <tt>MBeanServer</tt>. This is the
-     *            <var>targetPath</var> that was passed to {@link #mount mount}.
+     * @param nodeName
+     *            The <i>cascadedNode</i> property under which the source MBeans
+     *            will be mounted in the target <tt>MBeanServer</tt>. This is
+     *            the <var>nodeName</var> that was passed to {@link #mount
+     *            mount}.
      *            <p>
      * @param mountPointID
      *            The <var>mountPointID</var> identifying the mount operation.
@@ -646,22 +677,20 @@ public class CascadingService implements CascadingServiceMBean,
      *                If an IOException occurs while creating the cascading
      *                agent.
      **/
-    // protected 
+    // protected
     CascadingAgent createCascadingAgent(JMXConnector sourceConnector,
                                         ObjectName sourcePattern,
-                                        String targetPath,
-                                        MBeanServer targetMBS,
+                                        String nodeName, MBeanServer targetMBS,
                                         String mountPointID) throws IOException {
         final MBeanServerConnectionFactory sourceConnectionFactory = BasicMBeanServerConnectionFactory.newInstance(sourceConnector);
         return new ProxyCascadingAgent(sourceConnectionFactory, sourcePattern,
-                                       null, targetPath, targetMBS,
-                                       mountPointID);
+                                       null, nodeName, targetMBS, mountPointID);
     }
 
     /**
      * Increments and returns this object's notification sequence number.
      **/
-    // protected 
+    // protected
     final synchronized long newSequenceNumber() {
         return sequenceNumber++;
     }
@@ -673,7 +702,7 @@ public class CascadingService implements CascadingServiceMBean,
      *            The notification to send.
      * @see NotificationBroadcasterSupport#sendNotification
      */
-    // protected 
+    // protected
     void sendNotification(Notification notification) {
         emitter.sendNotification(notification);
     }
@@ -709,7 +738,7 @@ public class CascadingService implements CascadingServiceMBean,
      *                attempt to close the JMXConnector. <tt>terminate</tt> will
      *                never be called twice for the same mount point.
      **/
-    // protected 
+    // protected
     void terminate(CascadingAgent agent, JMXConnector sourceConnector,
                    String mountPointID) throws IOException {
         try {
@@ -721,18 +750,5 @@ public class CascadingService implements CascadingServiceMBean,
                 sourceConnector.close();
             }
         }
-    }
-
-    /* (non-Javadoc)
-     * @see com.hellblazer.jmx.cascading.CascadingServiceMBean#mount(java.lang.String, javax.management.ObjectName, java.lang.String)
-     */
-    @Override
-    public String mount(String sourceURL, String sourcePattern,
-                        String targetPath) throws IOException,
-                                          InstanceAlreadyExistsException,
-                                          MalformedObjectNameException {
-        JMXServiceURL url = new JMXServiceURL(sourceURL);
-        ObjectName name = new ObjectName(sourcePattern);
-        return mount(url, null, name, targetPath);
     }
 }
