@@ -185,6 +185,101 @@ public interface CascadingServiceMBean {
      * {@link #unmount unmount} with this <var>mountPointID</var> as parameter.
      * </p>
      * 
+     * @param sourceConnector
+     *            A <tt>JMXConnector</tt> to the target MBeanServer.
+     *            <p>
+     * @param sourcePattern
+     *            An <tt>ObjectName</tt> pattern that must be satisfied by the
+     *            <tt>ObjectName</tt>s of the source MBeans.
+     *            <p>
+     *            The sourcePattern is evaluated in the context of the source
+     *            <tt>MBeanServer</tt>. The source pattern is used to perform a
+     *            partial mount of the source <tt>MBeanServer</tt> in the target
+     *            <tt>MBeanServer</tt>. Only those MBeans that satisfy the
+     *            pattern will be mounted. The source pattern is thus a filter
+     *            element. A <tt>null</tt> sourcePattern is equivalent to the
+     *            wildcard <tt>"*:*"</tt>.
+     *            <p>
+     * @param targetPath
+     *            The <i>domain path</i> under which the source MBeans will be
+     *            mounted in the target <tt>MBeanServer</tt>.
+     *            <p>
+     *            If this parameter is not <tt>null</tt>, all source MBean names
+     *            will be transformed in the target <tt>MBeanServer</tt> by
+     *            prefixing their domain name with the string
+     *            <tt><i>targetPath</i>+"/"</tt>. An MBean whose name is
+     *            <tt>"D:k1=v1,k2=v2"</tt> will thus be mounted as
+     *            <tt>"<i>targetPath</i>/D:k1=v1,k2=v2"</tt>.
+     *            <p>
+     *            A <tt>null</tt> <var>targetPath</var> means that MBeans are
+     *            mounted directly at the root of the hierarchy, that is, as if
+     *            they were local MBeans. <b>Using a null <i>targetPath</i> is
+     *            thus highly discouraged, as it could cause name conflicts in
+     *            the target <tt>MBeanServer</tt></b>.
+     *            <p>
+     *            Similarly, MBeans from different sources should not be mounted
+     *            under the same <var>targetPath</var>. Moreover, an application
+     *            should not attempt to mount source MBeans under a
+     *            <var>targetPath</var> that already contain MBeans in the
+     *            target <tt>MBeanServer</tt>.
+     *            <p>
+     *            However, this implementation does not enforce these rules: It
+     *            is the responsibility of the application that uses the
+     *            <tt>CascadingService</tt> to ensure the consistency of the
+     *            mounting strategy - see
+     *            {@link com.hellblazer.jmx.cascading#The_File_System_Analogy
+     *            The File System Analogy}.
+     *            <p>
+     *            <b>Note:</b> A zero-length <var>targetPath</var> is treated as
+     *            a null <var>targetPath</var>.
+     *            <p>
+     * @return A <var>mountPointID</var> identifying this mount operation. This
+     *         mountPointID must be later used to call {@link #unmount}.
+     * @exception NullPointerException
+     *                if sourceURL is <tt>null</tt>. See
+     *                {@link JMXConnectorFactory#connect
+     *                JMXConnectorFactory.connect}.
+     * @exception IOException
+     *                if the connector client or the connection to the source
+     *                MBeanServer cannot be made, or if the underlying
+     *                <tt>CascadingAgent</tt> cannot be started because of a
+     *                communication problem. See
+     *                {@link JMXConnectorFactory#connect
+     *                JMXConnectorFactory.connect} and
+     *                {@link CascadingAgentMBean#start(boolean)
+     *                CascadingAgentMBean.start}.
+     * @exception SecurityException
+     *                if the connection with the source MBeanServer cannot be
+     *                made for security reasons. See
+     *                {@link JMXConnectorFactory#connect
+     *                JMXConnectorFactory.connect}.
+     * @exception InstanceAlreadyExistsException
+     *                if a name conflict is detected while performing the mount
+     *                operation. See {@link CascadingAgentMBean#start(boolean)
+     *                CascadingAgentMBean.start}.
+     **/
+    public String mount(JMXConnector sourceConnector, ObjectName sourcePattern,
+                        String targetPath) throws IOException,
+                                          InstanceAlreadyExistsException;
+
+    /**
+     * Mounts a partial view of the source <tt>MBeanServer</tt> identified by
+     * its <tt>JMXServiceURL</tt>.
+     * 
+     * This method obtains a {@link JMXConnector} by calling
+     * <tt>JMXConnectorFactory.connect(sourceURL,sourceMap)</tt>. Then it mounts
+     * the source <tt>MBeanServer</tt> thus connected under the provided
+     * <var>targetPath</var> into the target <tt>MBeanServer</tt> of this
+     * <tt>CascadingServiceMBean</tt>. Note that only the source MBeans whose
+     * source <tt>ObjectName</tt> satisfy the provided <var>sourcePattern</var>
+     * will be mounted.
+     * 
+     * <p>
+     * Finally, it returns a <var>mountPointID</var> string identifying this
+     * mount operation. The calling application is expected to later call
+     * {@link #unmount unmount} with this <var>mountPointID</var> as parameter.
+     * </p>
+     * 
      * @param sourceURL
      *            A <tt>JMXServiceURL</tt> from which a <tt>JMXConnector</tt> to
      *            the source <tt>MBeanServer</tt> can be obtained.

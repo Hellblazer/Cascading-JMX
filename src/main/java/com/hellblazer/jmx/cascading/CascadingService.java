@@ -145,17 +145,23 @@ public class CascadingService implements CascadingServiceMBean,
 
         public final String                  mountPointID;
         public final ObjectName              sourcePattern;
-        public final JMXServiceURL           sourceURL;
         public final String                  nodeName;
 
         private CascadingAgent               agent                   = null;
         private MBeanServerConnectionFactory sourceConnectionFactory = null;
         private JMXConnector                 sourceConnector         = null;
 
+        public MountPoint(JMXConnector sourceConnector,
+                          ObjectName sourcePattern, String nodeName)
+                                                                    throws IOException {
+            mountPointID = makeID(sourceConnector, sourcePattern, nodeName);
+            this.sourcePattern = sourcePattern;
+            this.nodeName = nodeName;
+        }
+
         public MountPoint(JMXServiceURL sourceURL, ObjectName sourcePattern,
                           String nodeName) throws IOException {
             mountPointID = makeID(sourceURL, sourcePattern, nodeName);
-            this.sourceURL = sourceURL;
             this.sourcePattern = sourcePattern;
             this.nodeName = nodeName;
         }
@@ -259,6 +265,19 @@ public class CascadingService implements CascadingServiceMBean,
                                                                                                           "Notifications relating to the underlying "
                                                                                                                   + "CascadingAgent.");
 
+    static String makeID(JMXConnector sourceConnector,
+                         ObjectName sourcePattern, String targetPath) {
+        String id;
+        try {
+            id = sourceConnector == null ? "???"
+                                        : sourceConnector.getConnectionId();
+        } catch (IOException e) {
+            throw new IllegalStateException("Unable to retrieve connection id",
+                                            e);
+        }
+        return "mount: " + id + " " + sourcePattern + " " + targetPath;
+    }
+
     static String makeID(JMXServiceURL sourceURL, ObjectName sourcePattern,
                          String targetPath) {
         final String url = sourceURL == null ? "???"
@@ -355,15 +374,68 @@ public class CascadingService implements CascadingServiceMBean,
     // Subclassing Hooks
     // -----------------
 
+    @Override
+    public final synchronized String mount(JMXConnector sourceConnector,
+                                           ObjectName sourcePattern,
+                                           String nameNode) throws IOException,
+                                                           InstanceAlreadyExistsException {
+
+        final MountPoint mpt = new MountPoint(sourceConnector, sourcePattern,
+                                              nameNode);
+
+        if (isMounted(mpt.mountPointID)) {
+            throw new IOException(mpt.mountPointID + ": already mounted.");
+        }
+
+        try {
+            mountMap.put(mpt.mountPointID, mpt);
+            mpt.mount(sourceConnector, getTargetMBeanServer());
+            return mpt.mountPointID;
+
+        } catch (Exception x) {
+            if (log.isDebugEnabled()) {
+                log.debug(String.format("Exception mounting %s, %s, %s, %s",
+                                        sourceConnector, sourcePattern,
+                                        nameNode, mpt), x);
+            }
+            try {
+
+                // This will close the sourceConnector if needed.
+                //
+                mountMap.remove(mpt.mountPointID);
+                mpt.unmount();
+
+            } catch (Exception xx) {
+                if (log.isDebugEnabled()) {
+                    log.debug(String.format("Error closing source connector %s",
+                                            mpt), xx);
+                }
+            }
+
+            // This is ugly...
+            //
+            if (x instanceof IOException) {
+                throw (IOException) x;
+            }
+            if (x instanceof InstanceAlreadyExistsException) {
+                throw (InstanceAlreadyExistsException) x;
+            }
+            if (x instanceof RuntimeException) {
+                throw (RuntimeException) x;
+            }
+            IOException io = new IOException(mpt.mountPointID + ": " + x, x);
+            throw io;
+        }
+    }
+
     // from CascadingServiceMBean
     //
     @Override
     public final synchronized String mount(JMXServiceURL sourceURL,
                                            Map<String, ?> sourceMap,
                                            ObjectName sourcePattern,
-                                           String nameNode)
-                                                             throws IOException,
-                                                             InstanceAlreadyExistsException {
+                                           String nameNode) throws IOException,
+                                                           InstanceAlreadyExistsException {
 
         final MountPoint mpt = new MountPoint(sourceURL, sourcePattern,
                                               nameNode);
@@ -425,10 +497,10 @@ public class CascadingService implements CascadingServiceMBean,
      * , javax.management.ObjectName, java.lang.String)
      */
     @Override
-    public String mount(String sourceURL, String sourcePattern,
-                        String nameNode) throws IOException,
-                                          InstanceAlreadyExistsException,
-                                          MalformedObjectNameException {
+    public String mount(String sourceURL, String sourcePattern, String nameNode)
+                                                                                throws IOException,
+                                                                                InstanceAlreadyExistsException,
+                                                                                MalformedObjectNameException {
         JMXServiceURL url = new JMXServiceURL(sourceURL);
         ObjectName name = new ObjectName(sourcePattern);
         return mount(url, null, name, nameNode);
