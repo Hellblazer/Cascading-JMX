@@ -319,8 +319,7 @@ public class ProxyCascadingAgent extends CascadingAgent {
                                ObjectName sourcePattern, QueryExp sourceQuery,
                                String nodeName, MBeanServer targetMBS,
                                String description) {
-        super(sourceConnection, sourcePattern, sourceQuery, nodeName,
-              targetMBS);
+        super(sourceConnection, sourcePattern, sourceQuery, nodeName, targetMBS);
         mbsNotifHandler = new NotificationListener() {
             @Override
             public void handleNotification(Notification notification,
@@ -555,8 +554,17 @@ public class ProxyCascadingAgent extends CascadingAgent {
                     nameConflictDetected("start", targetName);
                     throw new InstanceAlreadyExistsException(
                                                              String.valueOf(targetName));
+                } else if (targetName.getDomain().equals("JMImplementation")) {
+                    if (logger.isDebugEnabled()) {
+                        logger.debug(String.format("Not proxying JMImplementation domain source mBean %s",
+                                                   sourceName));
+                    }
                 } else {
                     names[count++] = sourceName;
+                    if (logger.isDebugEnabled()) {
+                        logger.debug(String.format("proxying %s as %s",
+                                                   sourceName, targetName));
+                    }
                 }
             }
 
@@ -1079,7 +1087,7 @@ public class ProxyCascadingAgent extends CascadingAgent {
         try {
             final String domain = sourceName.getDomain();
             final String list = sourceName.getKeyPropertyListString();
-            final String targetName = String.format("%s : %s = %s , %s",
+            final String targetName = String.format("%s:%s=%s,%s",
                                                     domain,
                                                     CASCADED_NODE_PROPERTY_NAME,
                                                     path, list);
@@ -1242,6 +1250,8 @@ public class ProxyCascadingAgent extends CascadingAgent {
                                                operation, targetName,
                                                sourceName));
                 }
+                assert srv.isRegistered(targetName) : String.format("Did not register proxy %s",
+                                                                    targetName);
             } catch (InstanceAlreadyExistsException x) {
                 unlink(sourceName);
                 nameConflictDetected(operation, targetName);
