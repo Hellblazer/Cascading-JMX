@@ -176,7 +176,7 @@ public class ProxyCascadingAgent extends CascadingAgent {
                                                     node, list);
             return ObjectName.getInstance(targetName);
         } catch (MalformedObjectNameException x) {
-            logger.error(String.format("Cannot crreate transformed source name %s",
+            logger.error(String.format("Cannot create transformed source name %s",
                                        sourceName), x);
             return sourceName;
         }
