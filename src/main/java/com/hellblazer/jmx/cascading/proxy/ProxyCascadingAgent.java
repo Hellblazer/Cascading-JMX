@@ -560,8 +560,8 @@ public class ProxyCascadingAgent extends CascadingAgent {
         }
 
         state = State.STARTING;
-        if (logger.isDebugEnabled()) {
-            logger.debug(String.format("start %s", state));
+        if (logger.isTraceEnabled()) {
+            logger.trace(String.format("start %s", state));
         }
         try {
             getConnectionFactory().getMBeanServerConnection().addNotificationListener(MBSDelegateObjectName,
@@ -603,14 +603,14 @@ public class ProxyCascadingAgent extends CascadingAgent {
                     throw new InstanceAlreadyExistsException(
                                                              String.valueOf(targetName));
                 } else if (targetName.getDomain().equals("JMImplementation")) {
-                    if (logger.isDebugEnabled()) {
-                        logger.debug(String.format("Not proxying JMImplementation domain source mBean %s",
+                    if (logger.isTraceEnabled()) {
+                        logger.trace(String.format("Not proxying JMImplementation domain source mBean %s",
                                                    sourceName));
                     }
                 } else {
                     names[count++] = sourceName;
-                    if (logger.isDebugEnabled()) {
-                        logger.debug(String.format("proxying %s as %s",
+                    if (logger.isTraceEnabled()) {
+                        logger.trace(String.format("proxying %s as %s",
                                                    sourceName, targetName));
                     }
                 }
@@ -629,8 +629,8 @@ public class ProxyCascadingAgent extends CascadingAgent {
         if (failure != null) {
             try {
                 state = State.SHUTTING_DOWN;
-                if (logger.isDebugEnabled()) {
-                    logger.debug(String.format("start: Failed to start: %s",
+                if (logger.isTraceEnabled()) {
+                    logger.trace(String.format("start: Failed to start: %s",
                                                state));
                 }
                 cleanup(false);
@@ -655,8 +655,8 @@ public class ProxyCascadingAgent extends CascadingAgent {
 
         // Everything OK.
         state = State.STARTED;
-        if (logger.isDebugEnabled()) {
-            logger.debug(String.format("start %s", state));
+        if (logger.isTraceEnabled()) {
+            logger.trace(String.format("start %s", state));
         }
     }
 
@@ -912,8 +912,8 @@ public class ProxyCascadingAgent extends CascadingAgent {
     //
     private synchronized void stop(boolean connectionDown) throws IOException {
         if (state.equals(State.STOPPED)) {
-            if (logger.isDebugEnabled()) {
-                logger.debug(String.format("stop, Already: %s ", state));
+            if (logger.isTraceEnabled()) {
+                logger.trace(String.format("stop, Already: %s ", state));
             }
             return;
         }
@@ -922,15 +922,15 @@ public class ProxyCascadingAgent extends CascadingAgent {
                                             + state);
         }
         state = State.SHUTTING_DOWN;
-        if (logger.isDebugEnabled()) {
-            logger.debug(String.format("stop: %s", state));
+        if (logger.isTraceEnabled()) {
+            logger.trace(String.format("stop: %s", state));
         }
         try {
             cleanup(connectionDown);
         } finally {
             state = State.STOPPED;
-            if (logger.isDebugEnabled()) {
-                logger.debug(String.format("stop: %s", state));
+            if (logger.isTraceEnabled()) {
+                logger.trace(String.format("stop: %s", state));
             }
         }
     }
