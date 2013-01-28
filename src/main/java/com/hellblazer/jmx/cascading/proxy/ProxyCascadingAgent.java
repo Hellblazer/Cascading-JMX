@@ -145,7 +145,42 @@ public class ProxyCascadingAgent extends CascadingAgent {
         STOPPED;
     }
 
-    private final static Logger                logger = LoggerFactory.getLogger(ProxyCascadingAgent.class);
+    private final static Logger logger = LoggerFactory.getLogger(ProxyCascadingAgent.class);
+
+    public static ObjectName getTargetName(String node, String sourceName) {
+        try {
+            return getTargetName(node, ObjectName.getInstance(sourceName));
+        } catch (MalformedObjectNameException | NullPointerException e) {
+            throw new IllegalStateException(
+                                            String.format("Invalid source name %s",
+                                                          sourceName));
+        }
+    }
+
+    /**
+     * @param node
+     * @param sourceName
+     * @return
+     */
+    public static ObjectName getTargetName(final String node,
+                                           ObjectName sourceName) {
+        if (node == null || node.length() == 0) {
+            return sourceName;
+        }
+        try {
+            final String domain = sourceName.getDomain();
+            final String list = sourceName.getKeyPropertyListString();
+            final String targetName = String.format("%s:%s=%s,%s",
+                                                    domain,
+                                                    CASCADED_NODE_PROPERTY_NAME,
+                                                    node, list);
+            return ObjectName.getInstance(targetName);
+        } catch (MalformedObjectNameException x) {
+            logger.error(String.format("Cannot crreate transformed source name %s",
+                                       sourceName), x);
+            return sourceName;
+        }
+    }
 
     private final String                       description;
 
@@ -371,6 +406,19 @@ public class ProxyCascadingAgent extends CascadingAgent {
     @Override
     public String getDescription() {
         return description;
+    }
+
+    /**
+     * Returns the <tt>ObjectName</tt> of the cascading proxy proxying the
+     * source MBean identified by the given sourceName.
+     * 
+     * @param sourceName
+     *            The source MBean name.
+     * @return The target MBean name.
+     **/
+    public ObjectName getTargetName(ObjectName sourceName) {
+        final String node = getNodeName();
+        return getTargetName(node, sourceName);
     }
 
     // from CascadingAgentMBean
@@ -1069,34 +1117,6 @@ public class ProxyCascadingAgent extends CascadingAgent {
      **/
     protected final synchronized long newSequenceNumber() {
         return sequenceNumber++;
-    }
-
-    /**
-     * Returns the <tt>ObjectName</tt> of the cascading proxy proxying the
-     * source MBean identified by the given sourceName.
-     * 
-     * @param sourceName
-     *            The source MBean name.
-     * @return The target MBean name.
-     **/
-    ObjectName getTargetName(ObjectName sourceName) {
-        final String path = getNodeName();
-        if (path == null || path.length() == 0) {
-            return sourceName;
-        }
-        try {
-            final String domain = sourceName.getDomain();
-            final String list = sourceName.getKeyPropertyListString();
-            final String targetName = String.format("%s:%s=%s,%s",
-                                                    domain,
-                                                    CASCADED_NODE_PROPERTY_NAME,
-                                                    path, list);
-            return ObjectName.getInstance(targetName);
-        } catch (MalformedObjectNameException x) {
-            logger.error(String.format("Cannot crreate transformed source name %s",
-                                       sourceName), x);
-            return sourceName;
-        }
     }
 
     /**
