@@ -862,6 +862,10 @@ public class ProxyCascadingAgent extends CascadingAgent {
      **/
     private boolean isIncluded(ObjectName sourceName, ObjectName sourcePattern,
                                QueryExp sourceQuery) {
+
+        if (sourceName.getDomain().equals("JMImplementation")) {
+            return false;
+        }
         // match the sourcePattern
         //
         try {
