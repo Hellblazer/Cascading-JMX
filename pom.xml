@@ -3,14 +3,14 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.hellblazer</groupId>
 	<artifactId>cascading-jmx</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
+	<version>0.0.1</version>
 	<name>Cascading JMX</name>
 	<description>A JMX federation for MBeanServers</description>
 	<dependencies>
 		<dependency>
 			<groupId>org.slf4j</groupId>
 			<artifactId>slf4j-api</artifactId>
-			<version>1.6.6</version>
+			<version>1.7.5</version>
 		</dependency>
 	</dependencies>
 	<build>
