@@ -3,7 +3,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.hellblazer</groupId>
 	<artifactId>cascading-jmx.app</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
+	<version>0.0.2-SNAPSHOT</version>
 	<name>Cascading JMX App</name>
 	<packaging>pom</packaging>
 	<description>Top level project for the cascading JMX</description>
