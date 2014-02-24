@@ -1,0 +1,9 @@
+gossip:
+    seeds: 
+        - localhost:6754
+        - localhost:6543
+name: com.hellblazer:type=CascadingService
+serviceNames:
+    - service:daemon:jmx:rmi
+    - service:daemon:jmx:http
+    - service:daemon:jmx:snmp
