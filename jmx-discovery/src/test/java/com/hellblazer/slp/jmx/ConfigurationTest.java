@@ -22,7 +22,7 @@ import java.util.List;
 
 import org.junit.Test;
 
-import com.hellblazer.slp.jmx.Configuration;
+import com.hellblazer.slp.jmx.JmxDiscoveryConfiguration;
 
 /**
  * @author hhildebrand
@@ -32,8 +32,8 @@ public class ConfigurationTest {
 
     @Test
     public void testYaml() throws Exception {
-        Configuration config = Configuration.fromYaml(getClass().getResourceAsStream("testConfig.yml"));
-        assertNotNull(config.gossip);
+        JmxDiscoveryConfiguration config = JmxDiscoveryConfiguration.fromYaml(getClass().getResourceAsStream("testConfig.yml"));
+        assertNotNull(config.discovery);
         assertEquals("com.hellblazer:type=CascadingService", config.name);
         List<String> serviceNames = config.serviceNames;
         assertEquals(3, serviceNames.size());

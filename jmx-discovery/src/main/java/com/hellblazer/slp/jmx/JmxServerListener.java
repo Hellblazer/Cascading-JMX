@@ -26,10 +26,8 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import javax.management.InstanceAlreadyExistsException;
-import javax.management.MBeanRegistrationException;
 import javax.management.MBeanServerConnection;
 import javax.management.MalformedObjectNameException;
-import javax.management.NotCompliantMBeanException;
 import javax.management.ObjectName;
 import javax.management.remote.JMXServiceURL;
 
@@ -101,9 +99,9 @@ public class JmxServerListener {
                                              configFilename));
             System.exit(1);
         }
-        Configuration config = null;
+        JmxDiscoveryConfiguration config = null;
         try {
-            config = Configuration.fromYaml(yaml);
+            config = JmxDiscoveryConfiguration.fromYaml(yaml);
         } catch (IOException e) {
             System.err.println(String.format("Error parsing configuration %s: %s",
                                              argv[0], e.toString()));
@@ -111,9 +109,7 @@ public class JmxServerListener {
         }
         try {
             config.construct();
-        } catch (InvalidSyntaxException | InstanceAlreadyExistsException
-                | MBeanRegistrationException | NotCompliantMBeanException
-                | MalformedObjectNameException e) {
+        } catch (Exception e) {
             System.err.println(String.format("Cannot construct instance"));
             e.printStackTrace(System.err);
             System.exit(1);

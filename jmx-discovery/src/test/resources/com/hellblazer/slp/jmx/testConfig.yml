@@ -1,7 +1,9 @@
-gossip:
-    seeds: 
-        - localhost:6754
-        - localhost:6543
+discovery:
+    type: gossipScope
+    gossip:
+        seeds: 
+            - localhost:6754
+            - localhost:6543
 name: com.hellblazer:type=CascadingService
 serviceNames:
     - service:daemon:jmx:rmi
