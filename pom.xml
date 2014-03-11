@@ -73,15 +73,15 @@
 				<version>0.0.1-SNAPSHOT</version>
 			</dependency>
 			<dependency>
-				<groupId>com.hellblazer</groupId>
-				<artifactId>nexus</artifactId>
-				<version>1.0.2-SNAPSHOT</version>
-			</dependency>
-			<dependency>
 				<groupId>ch.qos.logback</groupId>
 				<artifactId>logback-classic</artifactId>
 				<version>1.0.7</version>
 				<scope>test</scope>
+			</dependency>
+			<dependency>
+				<groupId>com.chiralBehaviors</groupId>
+				<artifactId>discovery-module</artifactId>
+				<version>0.0.1-SNAPSHOT</version>
 			</dependency>
 		</dependencies>
 	</dependencyManagement>

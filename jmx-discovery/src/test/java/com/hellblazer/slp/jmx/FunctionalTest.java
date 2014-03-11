@@ -19,22 +19,14 @@ import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertTrue;
 
 import java.io.IOException;
-import java.lang.Thread.UncaughtExceptionHandler;
-import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
-import java.net.SocketException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.BitSet;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.List;
-import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
 import javax.management.InstanceAlreadyExistsException;
@@ -57,16 +49,11 @@ import net.gescobar.jmx.impl.MBeanFactory;
 import org.junit.After;
 import org.junit.Test;
 
-import com.hellblazer.gossip.Gossip;
-import com.hellblazer.gossip.SystemView;
-import com.hellblazer.gossip.UdpCommunications;
+import com.chiralBehaviors.slp.hive.configuration.HiveScopeConfiguration;
 import com.hellblazer.jmx.cascading.CascadingService;
-import com.hellblazer.nexus.GossipScope;
+import com.hellblazer.slp.ServiceScope;
 import com.hellblazer.slp.ServiceType;
 import com.hellblazer.slp.ServiceURL;
-import com.hellblazer.slp.jmx.JmxServerListener;
-import com.hellblazer.utils.fd.FailureDetectorFactory;
-import com.hellblazer.utils.fd.impl.AdaptiveFailureDetectorFactory;
 
 /**
  * @author hhildebrand
@@ -101,8 +88,8 @@ public class FunctionalTest {
     }
 
     private List<JMXConnectorServer> servers = new ArrayList<>();
-    private List<GossipScope>        scopes  = new ArrayList<>();
-    private GossipScope              listeningScope;
+    private List<ServiceScope>       scopes  = new ArrayList<>();
+    private ServiceScope             listeningScope;
 
     @After
     public void cleanup() {
@@ -116,7 +103,7 @@ public class FunctionalTest {
                 // ignored
             }
         }
-        for (GossipScope scope : scopes) {
+        for (ServiceScope scope : scopes) {
             scope.stop();
         }
     }
@@ -126,8 +113,6 @@ public class FunctionalTest {
         String abstractServiceType = "yeOldTimeJmx";
         System.setProperty("java.rmi.server.randomIDs", "true");
         int members = 6;
-        int maxseeds = 1;
-        List<Gossip> gossips = createGossips(members, maxseeds);
         MBeanServer listeningMbs = MBeanServerFactory.newMBeanServer();
         CascadingService cascadingService = new CascadingService();
         String name = "com.hellblazer:type=CascadingService";
@@ -143,8 +128,7 @@ public class FunctionalTest {
                                                        MBeanServerNotification.UNREGISTRATION_NOTIFICATION);
         listeningMbs.addNotificationListener(MBeanServerDelegate.DELEGATE_NAME,
                                              deregistrationListener, null, null);
-        listeningScope = new GossipScope(
-                                         createCommunications(Arrays.asList(gossips.get(0).getLocalAddress())));
+        listeningScope = new HiveScopeConfiguration().construct();
         listeningScope.start();
         JmxServerListener jmxListener = new JmxServerListener(cascadingService,
                                                               null, null,
@@ -156,7 +140,7 @@ public class FunctionalTest {
         List<ServiceURL> serviceUrls = new ArrayList<>();
         List<UUID> registrations = new ArrayList<>();
         for (int i = 0; i < members; i++) {
-            GossipScope scope = new GossipScope(gossips.get(i));
+            ServiceScope scope = new HiveScopeConfiguration().construct();
             scopes.add(scope);
             scope.start();
             MBeanServer mbs = MBeanServerFactory.newMBeanServer();
@@ -210,61 +194,6 @@ public class FunctionalTest {
         builder.append(url.getURLPath());
         ServiceURL jmxServiceURL = new ServiceURL(builder.toString());
         return jmxServiceURL;
-    }
-
-    protected Gossip createCommunications(Collection<InetSocketAddress> seedHosts)
-                                                                                  throws SocketException {
-        ThreadFactory threadFactory = new ThreadFactory() {
-            @Override
-            public Thread newThread(Runnable r) {
-                Thread t = new Thread(r);
-                t.setUncaughtExceptionHandler(new UncaughtExceptionHandler() {
-                    @Override
-                    public void uncaughtException(Thread t, Throwable e) {
-                        e.printStackTrace();
-                    }
-                });
-                return t;
-            }
-        };
-        UdpCommunications communications = new UdpCommunications(
-                                                                 new InetSocketAddress(
-                                                                                       "127.0.0.1",
-                                                                                       0),
-                                                                 Executors.newFixedThreadPool(2,
-                                                                                              threadFactory));
-        SystemView view = new SystemView(new Random(),
-                                         communications.getLocalAddress(),
-                                         seedHosts, 5000, 500000);
-        FailureDetectorFactory fdFactory = new AdaptiveFailureDetectorFactory(
-                                                                              0.9,
-                                                                              100,
-                                                                              0.8,
-                                                                              12000,
-                                                                              10,
-                                                                              3000);
-        Gossip gossip = new Gossip(communications, view, fdFactory,
-                                   new Random(), 1, TimeUnit.SECONDS, 3);
-        return gossip;
-    }
-
-    protected List<Gossip> createGossips(int membership, int maxSeeds)
-                                                                      throws SocketException {
-        Random entropy = new Random(666);
-        List<Gossip> members = new ArrayList<Gossip>();
-        Collection<InetSocketAddress> seedHosts = new ArrayList<InetSocketAddress>();
-        for (int i = 0; i < membership; i++) {
-            members.add(createCommunications(seedHosts));
-            if (i == 0) { // always add first member
-                seedHosts.add(members.get(0).getLocalAddress());
-            } else if (seedHosts.size() < maxSeeds) {
-                // add the new member with probability of 25%
-                if (entropy.nextDouble() < 0.25D) {
-                    seedHosts.add(members.get(i).getLocalAddress());
-                }
-            }
-        }
-        return members;
     }
 
     protected void register(MBeanServer mbs, DummyMBean dummy) {

@@ -28,12 +28,12 @@ import javax.management.ObjectName;
 import javax.management.remote.JMXConnectorFactory;
 import javax.management.remote.JMXServiceURL;
 
+import com.chiralBehaviors.disovery.configuration.DiscoveryModule;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.hellblazer.jmx.cascading.CascadingService;
-import com.hellblazer.nexus.config.GossipScopeModule;
 import com.hellblazer.slp.ServiceScope;
 import com.hellblazer.slp.config.ServiceScopeConfiguration;
 
@@ -48,7 +48,7 @@ public class JmxDiscoveryConfiguration {
                                                                       JsonMappingException,
                                                                       IOException {
         ObjectMapper objectMapper = new ObjectMapper(new YAMLFactory());
-        objectMapper.registerModule(new GossipScopeModule());
+        objectMapper.registerModule(new DiscoveryModule());
         return objectMapper.readValue(yaml, JmxDiscoveryConfiguration.class);
     }
 

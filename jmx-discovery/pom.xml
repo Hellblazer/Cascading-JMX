@@ -41,13 +41,13 @@
 			<artifactId>cascading-jmx</artifactId>
 		</dependency>
 		<dependency>
-			<groupId>com.hellblazer</groupId>
-			<artifactId>nexus</artifactId>
-		</dependency>
-		<dependency>
 			<groupId>ch.qos.logback</groupId>
 			<artifactId>logback-classic</artifactId>
 			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>com.chiralBehaviors</groupId>
+			<artifactId>discovery-module</artifactId>
 		</dependency>
 	</dependencies>
 
