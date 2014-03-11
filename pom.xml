@@ -14,6 +14,10 @@
     </modules>
 
 	<repositories>
+        <repository>
+            <id>ChiralBehaviors-Snapshots</id>
+            <url>http://repository-chiralbehaviors.forge.cloudbees.com/snapshot/</url>
+        </repository>
 		<repository>
 			<id>hellblazer-release</id>
 			<url>https://repository-hal900000.forge.cloudbees.com/release/</url>
